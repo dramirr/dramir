@@ -1,6 +1,6 @@
 """
 Main Flask Application - TalentRadar v2
-With proper logging and error handling
+FIXED VERSION: Proper static file serving + Flask 2.3+ compatibility
 """
 from flask import Flask, send_from_directory, jsonify
 from flask_jwt_extended import JWTManager
@@ -8,15 +8,17 @@ from flask_cors import CORS
 from datetime import timedelta
 import os
 import logging
-from utils.logging_config import setup_logging  # Import the new logging config
+from utils.logging_config import setup_logging
 
 # Import configuration
 from config import get_config
 
 # Create Flask app
-app = Flask(__name__)
+app = Flask(__name__, 
+            static_folder='../frontend',
+            static_url_path='')
 
-# Setup logging FIRST before any other imports that might use logging
+# Setup logging FIRST
 setup_logging(app)
 logger = logging.getLogger(__name__)
 
@@ -31,7 +33,13 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 
 # Initialize extensions
 jwt = JWTManager(app)
-CORS(app, origins=["http://localhost:*", "http://127.0.0.1:*"])
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:*", "http://127.0.0.1:*"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Import database components
 from database.db import init_database, create_default_admin, seed_database
@@ -57,48 +65,126 @@ seed_database()
 
 logger.info("Database initialized successfully")
 
-# Serve static files
+# ===================================
+# STATIC FILE SERVING ROUTES
+# ===================================
+
 @app.route('/')
 def index():
     """Serve the main HTML page"""
-    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend')
-    return send_from_directory(frontend_path, 'index.html')
+    try:
+        return send_from_directory('../frontend', 'index.html')
+    except Exception as e:
+        logger.error(f"Error serving index.html: {e}")
+        return jsonify({'error': 'Page not found'}), 404
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """Serve static assets"""
-    frontend_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'assets')
-    return send_from_directory(frontend_path, path)
+    """Serve static assets (CSS, JS, images)"""
+    try:
+        return send_from_directory('../frontend/assets', path)
+    except Exception as e:
+        logger.error(f"Error serving asset {path}: {e}")
+        return jsonify({'error': 'Asset not found'}), 404
 
-# Error handlers
+@app.route('/<path:path>')
+def serve_static(path):
+    """
+    Catch-all route for any other static files
+    This prevents 404 errors for direct file access
+    """
+    try:
+        # Don't serve API routes through static handler
+        if path.startswith('api/'):
+            return jsonify({'error': 'API endpoint not found'}), 404
+        
+        # Try to serve from frontend directory
+        return send_from_directory('../frontend', path)
+    except Exception as e:
+        logger.error(f"Error serving {path}: {e}")
+        # If file not found, serve index.html for client-side routing
+        try:
+            return send_from_directory('../frontend', 'index.html')
+        except:
+            return jsonify({'error': 'Page not found'}), 404
+
+# ===================================
+# ERROR HANDLERS
+# ===================================
+
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({'success': False, 'message': 'Resource not found'}), 404
+    """Handle 404 errors"""
+    logger.warning(f"404 error: {error}")
+    
+    # For API calls, return JSON
+    if '/api/' in str(error):
+        return jsonify({'success': False, 'message': 'API endpoint not found'}), 404
+    
+    # For other requests, serve index.html (SPA fallback)
+    try:
+        return send_from_directory('../frontend', 'index.html')
+    except:
+        return jsonify({'success': False, 'message': 'Resource not found'}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"Internal server error: {error}")
+    """Handle 500 errors"""
+    logger.error(f"Internal server error: {error}", exc_info=True)
     return jsonify({'success': False, 'message': 'Internal server error'}), 500
 
 @app.errorhandler(Exception)
 def handle_exception(error):
+    """Handle all other exceptions"""
     logger.error(f"Unhandled exception: {error}", exc_info=True)
     return jsonify({'success': False, 'message': 'An unexpected error occurred'}), 500
 
-# Health check endpoint
+# ===================================
+# HEALTH CHECK
+# ===================================
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
         'success': True,
         'status': 'healthy',
-        'version': '2.0.0'
+        'version': '2.0.0',
+        'message': 'TalentRadar API is running'
     })
+
+# ===================================
+# STARTUP MESSAGE (Fixed for Flask 2.3+)
+# ===================================
+
+def display_startup_message():
+    """Display startup message - called once at initialization"""
+    logger.info("=" * 80)
+    logger.info("🚀 TalentRadar ATS Started Successfully!")
+    logger.info("=" * 80)
+    logger.info(f"📍 Server: http://{config.HOST}:{config.PORT}")
+    logger.info(f"📊 Dashboard: http://localhost:{config.PORT}/")
+    logger.info(f"🔧 API Docs: http://localhost:{config.PORT}/api/health")
+    logger.info("=" * 80)
+    logger.info("Default Login: admin / admin123")
+    logger.info("⚠️  IMPORTANT: Change default password in production!")
+    logger.info("=" * 80)
+
+# Call startup message after initialization
+display_startup_message()
+
+# ===================================
+# RUN APPLICATION
+# ===================================
 
 if __name__ == '__main__':
     logger.info("Starting TalentRadar application...")
+    logger.info(f"Environment: {config.DEBUG and 'Development' or 'Production'}")
+    logger.info(f"Database: {config.DATABASE_URL}")
+    
     app.run(
         host=config.HOST,
         port=config.PORT,
-        debug=config.DEBUG
+        debug=config.DEBUG,
+        threaded=True  # Enable threading for concurrent requests
     )

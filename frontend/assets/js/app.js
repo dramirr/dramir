@@ -1,5 +1,6 @@
 // ===================================
 // FIXED app.js for TalentRadar
+// Removed redirects to login.html
 // ===================================
 
 let uploadMode = 'single';
@@ -64,24 +65,20 @@ async function loadPositions() {
         });
     } catch (error) {
         console.error('Failed to load positions:', error);
+        showNotification('Failed to load positions', 'error');
     }
 }
 
 // ===================================
 // 4. RESUME STATUS POLLING (FIXED)
 // ===================================
-
-/**
- * Poll resume status until processing is complete
- */
 async function pollResumeStatus(resumeId, onComplete) {
-    // Prevent duplicate polling
     if (activePollingIntervals.has(resumeId)) {
         console.log(`Already polling resume ${resumeId}`);
         return;
     }
 
-    const maxAttempts = 60; // 5 minutes max (5s intervals)
+    const maxAttempts = 60;
     let attempts = 0;
     
     console.log(`Starting to poll status for resume ${resumeId}`);
@@ -90,34 +87,27 @@ async function pollResumeStatus(resumeId, onComplete) {
         try {
             attempts++;
             
-            // Get resume status
             const data = await api.getResumeStatus(resumeId);
             console.log(`Resume ${resumeId} status (attempt ${attempts}):`, data.processing_status);
             
-            // Update UI if status element exists
             updateStatusDisplay(resumeId, data.processing_status);
             
-            // Check if processing is complete
             if (data.processing_status === 'completed' || data.processing_status === 'failed') {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
                 
                 console.log(`Resume ${resumeId} processing finished with status: ${data.processing_status}`);
                 
-                // Call completion handler
                 if (onComplete) {
                     onComplete(data, data.processing_status);
                 }
                 
-                // Refresh lists
                 await loadResults();
                 await loadDashboard();
                 
-                // Show notification
                 if (data.processing_status === 'completed') {
                     showNotification('✅ Resume processing completed!', 'success');
                     
-                    // If we have score data, display it
                     if (data.score) {
                         displayCompletedResult(resumeId, data);
                     }
@@ -126,7 +116,6 @@ async function pollResumeStatus(resumeId, onComplete) {
                 }
             }
             
-            // Stop polling after max attempts
             if (attempts >= maxAttempts) {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
@@ -136,56 +125,51 @@ async function pollResumeStatus(resumeId, onComplete) {
         } catch (error) {
             console.error('Polling error:', error);
             
-            // Stop polling on auth errors
             if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
                 showNotification('⚠️ Authentication error. Please login again.', 'error');
+                
+                // FIXED: Call logout instead of redirecting
+                if (typeof logout === 'function') {
+                    logout();
+                }
                 return;
             }
             
-            // Stop after max attempts
             if (attempts >= maxAttempts) {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
             }
         }
-    }, 5000); // Poll every 5 seconds
+    }, 5000);
     
-    // Store interval ID
     activePollingIntervals.set(resumeId, pollInterval);
 }
 
-/**
- * Update status display in UI
- */
 function updateStatusDisplay(resumeId, status) {
     const statusElement = document.getElementById(`status-${resumeId}`);
     if (!statusElement) return;
     
     const statusMessages = {
         'pending': 'Pending...',
-        'processing': '⏳ Processing... This may take a moment.',
+        'processing': '⏳ Processing...',
         'completed': '✅ Completed',
         'failed': '❌ Failed'
     };
     
     statusElement.textContent = statusMessages[status] || status;
     
-    // Update color based on status
     const colors = {
-        'pending': 'var(--warning, #ffc107)',
-        'processing': 'var(--info, #17a2b8)',
-        'completed': 'var(--success, #28a745)',
-        'failed': 'var(--danger, #dc3545)'
+        'pending': '#ffc107',
+        'processing': '#17a2b8',
+        'completed': '#28a745',
+        'failed': '#dc3545'
     };
     
     statusElement.style.color = colors[status] || 'inherit';
 }
 
-/**
- * Display completed result
- */
 function displayCompletedResult(resumeId, data) {
     const resultDiv = document.getElementById('uploadResult');
     if (!resultDiv) return;
@@ -209,9 +193,6 @@ function displayCompletedResult(resumeId, data) {
     }
 }
 
-/**
- * Clean up all polling intervals
- */
 function cleanupPolling() {
     activePollingIntervals.forEach((interval) => {
         clearInterval(interval);
@@ -228,7 +209,6 @@ async function uploadResume() {
     const statusDiv = document.getElementById('uploadStatus');
     const resultDiv = document.getElementById('uploadResult');
     
-    // Validation
     if (!fileInput.files[0]) {
         statusDiv.innerHTML = '<div class="alert alert-error">Please select a file</div>';
         return;
@@ -249,10 +229,8 @@ async function uploadResume() {
             throw new Error(result.message || 'Upload failed');
         }
         
-        // Show initial success
         statusDiv.innerHTML = '<div class="alert alert-success">✅ Resume uploaded successfully!</div>';
         
-        // Display processing status card
         const resumeInfo = result.resume;
         const candidateInfo = result.candidate;
         
@@ -270,17 +248,14 @@ async function uploadResume() {
             </div>
         `;
         
-        // Start polling for status updates
         pollResumeStatus(resumeInfo.id, (statusData, finalStatus) => {
             console.log(`Resume ${resumeInfo.id} processing complete:`, finalStatus);
             
-            // Hide spinner
             const spinner = resultDiv.querySelector('.processing-spinner');
             if (spinner) {
                 spinner.style.display = 'none';
             }
             
-            // Update the result display
             if (finalStatus === 'completed' && statusData.score) {
                 displayCompletedResult(resumeInfo.id, statusData);
             } else if (finalStatus === 'failed') {
@@ -292,7 +267,6 @@ async function uploadResume() {
             }
         });
         
-        // Clear file input
         fileInput.value = '';
         
     } catch (error) {
@@ -302,10 +276,10 @@ async function uploadResume() {
 }
 
 // ===================================
-// 6. BULK UPLOAD (FIXED)
+// 6. BULK UPLOAD
 // ===================================
-async function bulkUpload() {
-    const filesInput = document.getElementById('bulkFiles');
+async function bulkUploadResumes() {
+    const filesInput = document.getElementById('filesInput');
     const positionId = document.getElementById('positionSelect').value;
     const statusDiv = document.getElementById('uploadStatus');
     const resultDiv = document.getElementById('uploadResult');
@@ -333,7 +307,6 @@ async function bulkUpload() {
         
         statusDiv.innerHTML = `<div class="alert alert-success">✅ ${result.total_uploaded} files uploaded successfully!</div>`;
         
-        // Display results
         resultDiv.innerHTML = '<h4>Upload Results:</h4>';
         result.results.forEach(fileResult => {
             if (fileResult.success) {
@@ -344,7 +317,6 @@ async function bulkUpload() {
                     </div>
                 `;
                 
-                // Start polling for each uploaded file
                 pollResumeStatus(fileResult.resume_id);
             } else {
                 resultDiv.innerHTML += `
@@ -355,7 +327,6 @@ async function bulkUpload() {
             }
         });
         
-        // Clear file input
         filesInput.value = '';
         
     } catch (error) {
@@ -365,7 +336,70 @@ async function bulkUpload() {
 }
 
 // ===================================
-// 7. LOAD RESULTS
+// 7. LOAD DASHBOARD
+// ===================================
+async function loadDashboard() {
+    try {
+        const data = await api.getResumes();
+        const resumes = data.resumes || [];
+        
+        const stats = {
+            total: resumes.length,
+            completed: resumes.filter(r => r.processing_status === 'completed').length,
+            processing: resumes.filter(r => r.processing_status === 'processing').length,
+            qualified: resumes.filter(r => r.score && r.score.status === 'Qualified').length,
+            rejected: resumes.filter(r => r.score && r.score.status === 'Rejected').length
+        };
+        
+        const avgScore = resumes.length > 0 
+            ? resumes.filter(r => r.score).reduce((sum, r) => sum + r.score.percentage, 0) / Math.max(resumes.filter(r => r.score).length, 1)
+            : 0;
+        
+        // Update dashboard if elements exist
+        const statsContainer = document.getElementById('statsContainer');
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.total}</div>
+                    <div class="stat-label">📊 Total Resumes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.qualified}</div>
+                    <div class="stat-label">✅ Qualified</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.rejected}</div>
+                    <div class="stat-label">❌ Rejected</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgScore.toFixed(1)}%</div>
+                    <div class="stat-label">📈 Avg Score</div>
+                </div>
+            `;
+        }
+        
+        const recentDiv = document.getElementById('recentApplications');
+        if (recentDiv) {
+            recentDiv.innerHTML = '<h3>Recent Applications</h3>';
+            resumes.slice(0, 5).forEach(resume => {
+                recentDiv.innerHTML += `
+                    <div class="recent-item">
+                        <strong>${resume.candidate?.full_name || 'Processing...'}</strong>
+                        <span class="status-${resume.processing_status}">${resume.processing_status}</span>
+                        <small>${new Date(resume.uploaded_at).toLocaleDateString()}</small>
+                    </div>
+                `;
+            });
+        }
+        
+    } catch (error) {
+        console.error('Failed to load dashboard:', error);
+        showNotification('Failed to load dashboard', 'error');
+    }
+}
+
+// ===================================
+// 8. LOAD RESULTS
 // ===================================
 async function loadResults() {
     try {
@@ -376,48 +410,59 @@ async function loadResults() {
         const data = await api.getResumes(filters);
         currentResumes = data.resumes || [];
         
-        const tbody = document.getElementById('resultsTableBody');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '';
+        const tableDiv = document.getElementById('resultsTable');
+        if (!tableDiv) return;
         
         if (currentResumes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No resumes found</td></tr>';
+            tableDiv.innerHTML = '<p>No resumes found</p>';
             return;
         }
         
+        let tableHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Position</th>
+                        <th>Score</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
         currentResumes.forEach(resume => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${resume.candidate?.full_name || 'Processing...'}</td>
-                <td>${resume.position?.title || 'N/A'}</td>
-                <td>
-                    ${resume.score ? 
-                        `<span class="score-badge ${resume.score.status}">${resume.score.percentage.toFixed(1)}%</span>` : 
-                        '<span class="score-badge pending">Pending</span>'
-                    }
-                </td>
-                <td>
-                    <span class="status-badge status-${resume.processing_status}">
-                        ${resume.processing_status}
-                    </span>
-                </td>
-                <td>${new Date(resume.uploaded_at).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-small" onclick="viewResumeDetails(${resume.id})">View</button>
-                    ${resume.processing_status === 'processing' ? 
-                        `<button class="btn btn-small" onclick="pollResumeStatus(${resume.id})">Check Status</button>` : 
-                        ''
-                    }
-                </td>
+            tableHTML += `
+                <tr>
+                    <td>${resume.candidate?.full_name || 'Processing...'}</td>
+                    <td>${resume.position?.title || 'N/A'}</td>
+                    <td>
+                        ${resume.score ? 
+                            `<span class="score-badge ${resume.score.status}">${resume.score.percentage.toFixed(1)}%</span>` : 
+                            '<span class="score-badge pending">Pending</span>'
+                        }
+                    </td>
+                    <td>
+                        <span class="status-badge status-${resume.processing_status}">
+                            ${resume.processing_status}
+                        </span>
+                    </td>
+                    <td>${new Date(resume.uploaded_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="viewResumeDetails(${resume.id})">View</button>
+                    </td>
+                </tr>
             `;
-            tbody.appendChild(row);
             
-            // If resume is still processing, start polling
             if (resume.processing_status === 'processing' && !activePollingIntervals.has(resume.id)) {
                 pollResumeStatus(resume.id);
             }
         });
+        
+        tableHTML += '</tbody></table>';
+        tableDiv.innerHTML = tableHTML;
         
     } catch (error) {
         console.error('Failed to load results:', error);
@@ -426,51 +471,81 @@ async function loadResults() {
 }
 
 // ===================================
-// 8. DASHBOARD
+// 9. LOAD CANDIDATES
 // ===================================
-async function loadDashboard() {
+async function loadCandidates() {
     try {
-        const data = await api.getResumes();
-        const resumes = data.resumes || [];
+        const data = await api.getCandidates();
+        currentCandidates = data.candidates || [];
         
-        // Calculate statistics
-        const stats = {
-            total: resumes.length,
-            completed: resumes.filter(r => r.processing_status === 'completed').length,
-            processing: resumes.filter(r => r.processing_status === 'processing').length,
-            passed: resumes.filter(r => r.score && r.score.status === 'passed').length,
-            failed: resumes.filter(r => r.score && r.score.status === 'failed').length
-        };
+        const candidatesList = document.getElementById('candidatesList');
+        if (!candidatesList) return;
         
-        // Update dashboard stats
-        document.getElementById('totalResumes').textContent = stats.total;
-        document.getElementById('processedResumes').textContent = stats.completed;
-        document.getElementById('processingResumes').textContent = stats.processing;
-        document.getElementById('passedResumes').textContent = stats.passed;
+        candidatesList.innerHTML = '';
         
-        // Recent uploads
-        const recentList = document.getElementById('recentUploads');
-        if (recentList) {
-            recentList.innerHTML = '';
-            resumes.slice(0, 5).forEach(resume => {
-                const item = document.createElement('div');
-                item.className = 'recent-item';
-                item.innerHTML = `
-                    <strong>${resume.candidate?.full_name || 'Processing...'}</strong>
-                    <span class="status-${resume.processing_status}">${resume.processing_status}</span>
-                    <small>${new Date(resume.uploaded_at).toLocaleDateString()}</small>
-                `;
-                recentList.appendChild(item);
-            });
+        if (currentCandidates.length === 0) {
+            candidatesList.innerHTML = '<p>No candidates found</p>';
+            return;
         }
         
+        currentCandidates.forEach(candidate => {
+            const card = document.createElement('div');
+            card.className = 'candidate-card';
+            card.innerHTML = `
+                <h3>${candidate.full_name}</h3>
+                <p>📞 ${candidate.phone || 'N/A'}</p>
+                <p>📧 ${candidate.email || 'N/A'}</p>
+                <p>📊 ${candidate.total_submissions} submission(s)</p>
+                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">View Details</button>
+            `;
+            candidatesList.appendChild(card);
+        });
+        
     } catch (error) {
-        console.error('Failed to load dashboard:', error);
+        console.error('Failed to load candidates:', error);
+        showNotification('Failed to load candidates', 'error');
     }
 }
 
 // ===================================
-// 9. VIEW RESUME DETAILS
+// 10. LOAD POSITIONS LIST
+// ===================================
+async function loadPositionsList() {
+    try {
+        const data = await api.getPositions();
+        currentPositions = data.positions || [];
+        
+        const positionsList = document.getElementById('positionsList');
+        if (!positionsList) return;
+        
+        positionsList.innerHTML = '';
+        
+        if (currentPositions.length === 0) {
+            positionsList.innerHTML = '<p>No positions found</p>';
+            return;
+        }
+        
+        currentPositions.forEach(position => {
+            const card = document.createElement('div');
+            card.className = 'position-card';
+            card.innerHTML = `
+                <h3>${position.title}</h3>
+                <p>${position.description || 'No description'}</p>
+                <p><strong>Threshold:</strong> ${position.threshold_percentage}%</p>
+                <p><strong>Status:</strong> ${position.is_active ? '✅ Active' : '❌ Inactive'}</p>
+                <button class="btn-sm btn-primary" onclick="viewPositionDetails(${position.id})">View Details</button>
+            `;
+            positionsList.appendChild(card);
+        });
+        
+    } catch (error) {
+        console.error('Failed to load positions:', error);
+        showNotification('Failed to load positions', 'error');
+    }
+}
+
+// ===================================
+// 11. VIEW DETAILS
 // ===================================
 async function viewResumeDetails(resumeId) {
     try {
@@ -480,7 +555,6 @@ async function viewResumeDetails(resumeId) {
             throw new Error(resume.message || 'Failed to load resume details');
         }
         
-        // Create modal or navigate to details page
         alert(`Resume Details:\n
             Candidate: ${resume.candidate?.full_name || 'N/A'}
             Position: ${resume.position?.title || 'N/A'}
@@ -488,30 +562,131 @@ async function viewResumeDetails(resumeId) {
             Status: ${resume.score?.status || 'Processing'}
         `);
         
-        // TODO: Implement proper modal or details page
-        
     } catch (error) {
         console.error('Failed to load resume details:', error);
         showNotification('Failed to load resume details', 'error');
     }
 }
 
+async function viewCandidateDetails(candidateId) {
+    try {
+        const candidate = await api.getCandidate(candidateId);
+        
+        alert(`Candidate Details:\n
+            Name: ${candidate.full_name}
+            Phone: ${candidate.phone || 'N/A'}
+            Email: ${candidate.email || 'N/A'}
+            Total Submissions: ${candidate.total_submissions}
+        `);
+        
+    } catch (error) {
+        console.error('Failed to load candidate details:', error);
+        showNotification('Failed to load candidate details', 'error');
+    }
+}
+
+async function viewPositionDetails(positionId) {
+    try {
+        const position = await api.getPosition(positionId);
+        
+        alert(`Position Details:\n
+            Title: ${position.title}
+            Description: ${position.description || 'N/A'}
+            Threshold: ${position.threshold_percentage}%
+            Criteria Count: ${position.criteria?.length || 0}
+        `);
+        
+    } catch (error) {
+        console.error('Failed to load position details:', error);
+        showNotification('Failed to load position details', 'error');
+    }
+}
+
 // ===================================
-// 10. NOTIFICATIONS
+// 12. SEARCH CANDIDATES
+// ===================================
+async function searchCandidates() {
+    const searchInput = document.getElementById('searchCandidate');
+    const query = searchInput?.value || '';
+    
+    if (query.length < 2) {
+        loadCandidates();
+        return;
+    }
+    
+    try {
+        const data = await api.searchCandidates(query);
+        currentCandidates = data.candidates || [];
+        
+        const candidatesList = document.getElementById('candidatesList');
+        if (!candidatesList) return;
+        
+        candidatesList.innerHTML = '';
+        
+        if (currentCandidates.length === 0) {
+            candidatesList.innerHTML = '<p>No candidates found</p>';
+            return;
+        }
+        
+        currentCandidates.forEach(candidate => {
+            const card = document.createElement('div');
+            card.className = 'candidate-card';
+            card.innerHTML = `
+                <h3>${candidate.full_name}</h3>
+                <p>📞 ${candidate.phone || 'N/A'}</p>
+                <p>📧 ${candidate.email || 'N/A'}</p>
+                <p>📊 ${candidate.total_submissions} submission(s)</p>
+                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">View Details</button>
+            `;
+            candidatesList.appendChild(card);
+        });
+        
+    } catch (error) {
+        console.error('Search error:', error);
+        showNotification('Search failed', 'error');
+    }
+}
+
+// ===================================
+// 13. FILTER RESULTS
+// ===================================
+function filterResults() {
+    loadResults();
+}
+
+// ===================================
+// 14. NOTIFICATIONS
 // ===================================
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
     notification.textContent = message;
     
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s;
+    `;
+    
     document.body.appendChild(notification);
     
     setTimeout(() => {
-        notification.classList.add('show');
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(0)';
     }, 100);
     
     setTimeout(() => {
-        notification.classList.remove('show');
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
         setTimeout(() => {
             notification.remove();
         }, 300);
@@ -519,71 +694,36 @@ function showNotification(message, type = 'info') {
 }
 
 // ===================================
-// 11. AUTHENTICATION CHECK
-// ===================================
-async function checkAuth() {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        window.location.href = '/login.html';
-        return false;
-    }
-    
-    try {
-        const user = await api.getCurrentUser();
-        document.getElementById('username').textContent = user.username;
-        return true;
-    } catch (error) {
-        console.error('Auth check failed:', error);
-        window.location.href = '/login.html';
-        return false;
-    }
-}
-
-// ===================================
-// 12. LOGOUT
-// ===================================
-async function logout() {
-    try {
-        await api.logout();
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-    
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    window.location.href = '/login.html';
-}
-
-// ===================================
-// 13. INITIALIZATION
+// 15. INITIALIZATION (REMOVED checkAuth)
 // ===================================
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check authentication
-    const isAuthenticated = await checkAuth();
-    if (!isAuthenticated) return;
+    console.log('App.js: DOM loaded');
     
-    // Load initial data
-    await loadPositions();
-    await loadDashboard();
+    // Note: auth.js will handle authentication check
+    // We just set up event listeners here
     
-    // Setup file input listeners
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
             const fileName = e.target.files[0]?.name || 'No file selected';
-            document.getElementById('fileName').textContent = fileName;
+            const fileNameDisplay = document.getElementById('fileName');
+            if (fileNameDisplay) {
+                fileNameDisplay.textContent = fileName;
+            }
         });
     }
     
-    const bulkFiles = document.getElementById('bulkFiles');
-    if (bulkFiles) {
-        bulkFiles.addEventListener('change', (e) => {
+    const filesInput = document.getElementById('filesInput');
+    if (filesInput) {
+        filesInput.addEventListener('change', (e) => {
             const count = e.target.files.length;
-            document.getElementById('fileCount').textContent = `${count} file(s) selected`;
+            const fileCountDisplay = document.getElementById('fileCount');
+            if (fileCountDisplay) {
+                fileCountDisplay.textContent = `${count} file(s) selected`;
+            }
         });
     }
     
-    // Cleanup polling on page unload
     window.addEventListener('beforeunload', () => {
         cleanupPolling();
     });
@@ -595,8 +735,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 window.switchTab = switchTab;
 window.setUploadMode = setUploadMode;
 window.uploadResume = uploadResume;
-window.bulkUpload = bulkUpload;
+window.bulkUploadResumes = bulkUploadResumes;
 window.loadResults = loadResults;
+window.loadDashboard = loadDashboard;
+window.loadCandidates = loadCandidates;
+window.loadPositionsList = loadPositionsList;
+window.loadPositions = loadPositions;
 window.viewResumeDetails = viewResumeDetails;
-window.logout = logout;
+window.viewCandidateDetails = viewCandidateDetails;
+window.viewPositionDetails = viewPositionDetails;
+window.searchCandidates = searchCandidates;
+window.filterResults = filterResults;
 window.pollResumeStatus = pollResumeStatus;

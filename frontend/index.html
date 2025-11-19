@@ -4,14 +4,121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TalentRadar - AI-Powered ATS</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <link rel="stylesheet" href="/assets/css/styles.css">
+    <style>
+        /* Additional styles for notifications and loading */
+        .processing-spinner {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid var(--primary, #3b82f6);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .result-card, .processing-card {
+            background: var(--bg-light, #334155);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .score-display {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-top: 15px;
+        }
+        
+        .score-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            background: var(--bg-dark, #0f172a);
+        }
+        
+        .score-circle.Qualified {
+            border: 3px solid var(--success, #10b981);
+            color: var(--success, #10b981);
+        }
+        
+        .score-circle.Rejected {
+            border: 3px solid var(--error, #ef4444);
+            color: var(--error, #ef4444);
+        }
+        
+        .score-details {
+            flex: 1;
+        }
+        
+        .bulk-result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+        
+        .bulk-result-item.success {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--success, #10b981);
+        }
+        
+        .bulk-result-item.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid var(--error, #ef4444);
+        }
+        
+        .recent-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: var(--bg-light, #334155);
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        
+        .candidate-card, .position-card {
+            background: var(--bg-medium, #1e293b);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border, #475569);
+            margin-bottom: 15px;
+        }
+        
+        .candidate-card h3, .position-card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <header class="header">
             <div class="header-left">
                 <div class="logo-container">
-                    <img src="assets/images/logo.png" alt="TalentRadar" class="logo" id="logoImg">
+                    <div class="logo" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">T</div>
                     <div class="header-title">
                         <h1>TalentRadar</h1>
                         <p class="subtitle">AI-Powered Applicant Tracking System</p>
@@ -30,25 +137,31 @@
             </div>
         </header>
 
-        <div id="loginSection" class="login-section">
+        <!-- Login Section -->
+        <div id="loginSection" class="login-section" style="display: flex;">
             <div class="login-card">
                 <h2>Login to TalentRadar</h2>
                 <form id="loginForm" onsubmit="handleLogin(event)">
                     <div class="form-group">
                         <label>Username</label>
-                        <input type="text" id="loginUsername" class="form-control" required>
+                        <input type="text" id="loginUsername" class="form-control" value="admin" required>
                     </div>
                     <div class="form-group">
                         <label>Password</label>
-                        <input type="password" id="loginPassword" class="form-control" required>
+                        <input type="password" id="loginPassword" class="form-control" value="admin123" required>
                     </div>
                     <button type="submit" class="btn-primary btn-block">Login</button>
                 </form>
                 <div id="loginError" class="alert alert-error" style="display:none; margin-top:15px;"></div>
+                <p style="margin-top: 20px; text-align: center; color: var(--text-secondary, #94a3b8); font-size: 13px;">
+                    Default credentials: admin / admin123
+                </p>
             </div>
         </div>
 
+        <!-- Main App (Hidden by default) -->
         <div id="mainApp" style="display:none;">
+            <!-- Navigation Tabs -->
             <nav class="tabs">
                 <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
                 <div class="tab" onclick="switchTab('upload')">📤 Upload Resume</div>
@@ -57,6 +170,7 @@
                 <div class="tab" onclick="switchTab('positions')">💼 Positions</div>
             </nav>
 
+            <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content active">
                 <h2>Dashboard</h2>
                 <div class="stats-grid" id="statsContainer">
@@ -78,10 +192,10 @@
                     </div>
                 </div>
 
-                <h3>Recent Applications</h3>
                 <div id="recentApplications"></div>
             </div>
 
+            <!-- Upload Tab -->
             <div id="upload" class="tab-content">
                 <h2>Upload Resume</h2>
                 
@@ -101,20 +215,24 @@
                         </div>
                     </div>
 
+                    <!-- Single Upload -->
                     <div id="singleUpload">
                         <div class="form-group">
                             <label>Select Resume File</label>
                             <input type="file" id="fileInput" class="form-control" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png">
+                            <small id="fileName" style="display: block; margin-top: 5px; color: var(--text-secondary);">No file selected</small>
                         </div>
                         <button class="btn-primary" onclick="uploadResume()">
                             <span class="btn-icon">📤</span> Upload & Analyze
                         </button>
                     </div>
 
+                    <!-- Bulk Upload -->
                     <div id="bulkUpload" style="display:none;">
                         <div class="form-group">
                             <label>Select Multiple Resumes</label>
                             <input type="file" id="filesInput" class="form-control" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png">
+                            <small id="fileCount" style="display: block; margin-top: 5px; color: var(--text-secondary);">0 file(s) selected</small>
                         </div>
                         <button class="btn-primary" onclick="bulkUploadResumes()">
                             <span class="btn-icon">📤</span> Upload All
@@ -126,6 +244,7 @@
                 <div id="uploadResult" class="upload-result"></div>
             </div>
 
+            <!-- Results Tab -->
             <div id="results" class="tab-content">
                 <h2>All Results</h2>
                 
@@ -135,17 +254,16 @@
                     </select>
                     <select id="filterStatus" class="form-control" onchange="filterResults()">
                         <option value="">All Status</option>
-                        <option value="Qualified">Qualified</option>
-                        <option value="Rejected">Rejected</option>
+                        <option value="completed">Completed</option>
+                        <option value="processing">Processing</option>
+                        <option value="failed">Failed</option>
                     </select>
-                    <button class="btn-secondary" onclick="downloadExcel()">
-                        <span class="btn-icon">📥</span> Export Excel
-                    </button>
                 </div>
 
                 <div id="resultsTable" class="results-table"></div>
             </div>
 
+            <!-- Candidates Tab -->
             <div id="candidates" class="tab-content">
                 <h2>Candidates</h2>
                 
@@ -156,10 +274,11 @@
                 <div id="candidatesList" class="candidates-list"></div>
             </div>
 
+            <!-- Positions Tab -->
             <div id="positions" class="tab-content">
                 <h2>Positions</h2>
                 
-                <button class="btn-primary" onclick="showCreatePosition()">
+                <button class="btn-primary" onclick="alert('Create position feature coming soon!')">
                     <span class="btn-icon">➕</span> Create Position
                 </button>
 
@@ -168,15 +287,14 @@
         </div>
     </div>
 
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close" onclick="closeModal()">&times;</span>
-            <div id="modalBody"></div>
-        </div>
-    </div>
-
-    <script src="assets/js/api.js"></script>
-    <script src="assets/js/auth.js"></script>
-    <script src="assets/js/app.js"></script>
+    <!-- Load scripts in correct order -->
+    <!-- 1. API service first -->
+    <script src="/assets/js/api.js"></script>
+    
+    <!-- 2. Auth logic (handles login/logout and initial auth check) -->
+    <script src="/assets/js/auth.js"></script>
+    
+    <!-- 3. Main app logic (handles UI and features) -->
+    <script src="/assets/js/app.js"></script>
 </body>
 </html>
