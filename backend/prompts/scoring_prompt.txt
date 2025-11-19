@@ -1,0 +1,72 @@
+SCORING SYSTEM EXPLANATION
+
+This document explains how the graduated scoring system works in TalentRadar v2.
+
+NOTE: Scoring is performed by Python code (scoring_service.py), not by AI.
+This file is for reference only.
+
+=== SCORING STRATEGIES ===
+
+1. RANGED NUMBER SCORING
+   Used for: age, years of experience, language percentage
+   
+   Example: Work Experience (20 points)
+   - 10+ years → 100% (20 points) - Expert level
+   - 5-9 years → 85% (17 points) - Senior level
+   - 2-4 years → 60% (12 points) - Qualified level
+   - 0-1 years → 15% (3 points) - Junior level
+
+2. GRADED CATEGORY SCORING
+   Used for: skill levels (Excel, Sepidar, Office)
+   
+   Example: Excel Skills (8 points)
+   - Advanced → 100% (8 points)
+   - Intermediate → 65% (5.2 points)
+   - Basic → 20% (1.6 points)
+   - None → 0% (0 points)
+
+3. BOOLEAN SCORING
+   Used for: yes/no experience questions
+   
+   Example: Financial Reports Experience (2 points)
+   - Has experience → 100% (2 points)
+   - No experience → 0% (0 points)
+
+4. TEXT MATCHING SCORING
+   Used for: education field, industry type
+   
+   Example: Education Field (10 points)
+   - Matches required keywords → 100% (10 points)
+   - No match → 0% (0 points)
+
+=== AGGREGATE SCORING ===
+
+Total Score = Sum of all awarded points
+Max Score = Sum of all maximum points
+Percentage = (Total Score / Max Score) × 100
+
+Status:
+- Qualified: Percentage >= Threshold (default 75%)
+- Rejected: Percentage < Threshold
+
+=== ASSESSMENT GENERATION ===
+
+The system automatically generates an assessment based on:
+- Overall percentage score
+- Number of strong criteria (score ≥ 80%)
+- Number of weak criteria (score < 50%)
+- Comparison to threshold
+
+Example Assessments:
+- 90%+: "Excellent candidate - Exceeds requirements significantly"
+- 80-89%: "Strong candidate - Meets all key requirements"
+- 75-79%: "Qualified candidate - Meets minimum requirements"
+- Below threshold: "Below threshold by X percentage points"
+
+=== FAIRNESS PRINCIPLES ===
+
+1. Graduated scoring recognizes different experience levels
+2. Partial credit given for near-misses
+3. Excellence rewarded (10 years > 2 years)
+4. Transparent reasoning for each score
+5. Configurable ranges per position
