@@ -1,12 +1,13 @@
 """
 AI Service for Resume Analysis
-FIXED FOR LIARA API - Using multipart/form-data with files
+FIXED FOR LIARA API - Based on working app.py example
 """
 import requests
 import os
 import logging
-from typing import Dict, Any
 import json
+import base64
+from typing import Dict, Any
 
 from backend.config import get_config
 
@@ -37,7 +38,8 @@ class AIService:
     
     def analyze_resume(self, file_path: str, prompt: str) -> str:
         """
-        ✅ Analyze resume using Liara API with file upload
+        ✅ FIXED: Analyze resume using Liara API with proper file upload
+        Based on working app.py example
         
         Args:
             file_path: Path to resume file
@@ -58,73 +60,91 @@ class AIService:
             filename = os.path.basename(file_path)
             logger.info(f"📂 File: {filename} ({file_size} bytes)")
             
-            # Build request URL
+            # ✅ Read and encode file to base64 (like in working app.py)
+            with open(file_path, 'rb') as file:
+                file_content = file.read()
+                base64_content = base64.b64encode(file_content).decode('utf-8')
+            
+            logger.info(f"📄 File encoded to base64 ({len(base64_content)} chars)")
+            
+            # ✅ Build request URL
             url = f"{self.base_url}/chat/completions"
             
-            # ✅ CRITICAL: Use headers WITHOUT Content-Type (requests will set it automatically for multipart)
+            # ✅ Build headers (exactly like working app.py)
             headers = {
+                'Content-Type': 'application/json',
                 'Authorization': f'Bearer {self.api_key}'
             }
             
-            # ✅ Open file and prepare multipart form data
-            with open(file_path, 'rb') as file:
-                # Build the messages structure
-                messages = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "file",
-                                "file": {
-                                    "filename": filename
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt
+            # ✅ Build messages with document type (like working app.py)
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": base64_content
                             }
-                        ]
-                    }
-                ]
-                
-                # ✅ Prepare data payload
-                data = {
-                    'model': config.AI_MODEL,
-                    'max_tokens': str(config.AI_MAX_TOKENS),
-                    'temperature': str(config.AI_TEMPERATURE),
-                    'messages': json.dumps(messages)
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
                 }
-                
-                # ✅ Prepare files payload (key name might be 'file' or 'files')
-                files = {
-                    'file': (filename, file, 'application/pdf')
-                }
-                
-                logger.info(f"🤖 Calling Liara API: {url}")
-                logger.info(f"📊 Model: {config.AI_MODEL}")
-                logger.info(f"📄 Uploading file: {filename}")
-                
-                # ✅ Make request with files
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    data=data,
-                    files=files,
-                    timeout=120
-                )
+            ]
+            
+            # ✅ Build payload (exactly like working app.py)
+            payload = {
+                "model": config.AI_MODEL,
+                "max_tokens": config.AI_MAX_TOKENS,
+                "temperature": config.AI_TEMPERATURE,
+                "messages": messages
+            }
+            
+            logger.info(f"🤖 Calling Liara API: {url}")
+            logger.info(f"📊 Model: {config.AI_MODEL}")
+            logger.info(f"📄 Document size: {len(base64_content)} base64 chars")
+            
+            # ✅ Make request (exactly like working app.py)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=120
+            )
             
             logger.info(f"📥 Response status: {response.status_code}")
             
+            # ✅ FIXED: Better error handling
             if response.status_code != 200:
-                logger.error(f"❌ API Error Response: {response.text}")
+                error_text = response.text
+                logger.error(f"❌ API Error Response: {error_text}")
+                
                 try:
                     error_data = response.json()
-                    error_msg = error_data.get('error', {}).get('message', response.text)
-                    raise ValueError(f"API Error ({response.status_code}): {error_msg}")
-                except json.JSONDecodeError:
-                    raise ValueError(f"API Error ({response.status_code}): {response.text}")
+                    # ✅ FIXED: Handle both dict and string error formats
+                    if isinstance(error_data, dict):
+                        if 'error' in error_data:
+                            if isinstance(error_data['error'], dict):
+                                error_msg = error_data['error'].get('message', error_text)
+                            else:
+                                error_msg = str(error_data['error'])
+                        elif 'message' in error_data:
+                            error_msg = error_data['message']
+                        else:
+                            error_msg = error_text
+                    else:
+                        error_msg = str(error_data)
+                except (json.JSONDecodeError, ValueError):
+                    error_msg = error_text
+                
+                raise ValueError(f"API Error ({response.status_code}): {error_msg}")
             
-            # Parse response
+            # ✅ Parse response (like working app.py)
             result_data = response.json()
             
             # Check if response has expected structure
@@ -132,6 +152,10 @@ class AIService:
                 logger.error(f"Unexpected response structure: {result_data}")
                 raise ValueError("Invalid API response structure")
             
+            if not result_data['choices']:
+                raise ValueError("Empty choices in API response")
+            
+            # Extract content
             result = result_data['choices'][0]['message']['content']
             
             logger.info(f"✅ Success! Response length: {len(result)} characters")
@@ -192,12 +216,32 @@ class AIService:
                 ]
             }
             
+            logger.info(f"🤖 Calling Liara API for text generation")
+            
             response = requests.post(url, headers=headers, json=payload, timeout=60)
             
+            logger.info(f"📥 Response status: {response.status_code}")
+            
             if response.status_code != 200:
-                raise ValueError(f"API error: {response.status_code} - {response.text}")
+                error_text = response.text
+                logger.error(f"❌ API Error: {error_text}")
+                
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict):
+                        error_msg = error_data.get('message', error_data.get('error', error_text))
+                    else:
+                        error_msg = str(error_data)
+                except:
+                    error_msg = error_text
+                
+                raise ValueError(f"API error: {response.status_code} - {error_msg}")
             
             result_data = response.json()
+            
+            if 'choices' not in result_data or not result_data['choices']:
+                raise ValueError("Invalid API response structure")
+            
             return result_data['choices'][0]['message']['content']
             
         except Exception as e:
@@ -205,4 +249,5 @@ class AIService:
             raise
 
 
+# Singleton instance
 ai_service = AIService()

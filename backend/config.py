@@ -1,5 +1,6 @@
 """
 Configuration Management for TalentRadar v2
+FIXED: Correct AI model name for Liara API
 """
 import os
 from pathlib import Path
@@ -29,7 +30,8 @@ class Config:
     DATABASE_ECHO = os.getenv('DATABASE_ECHO', 'False') == 'True'
     
     # AI Configuration
-    AI_MODEL = os.getenv('AI_MODEL', 'claude-sonnet-4-20250514')
+    # ✅ FIXED: Use correct model name from .env.template
+    AI_MODEL = os.getenv('AI_MODEL', 'anthropic/claude-sonnet-4.5')
     AI_TEMPERATURE = float(os.getenv('AI_TEMPERATURE', '0.1'))
     AI_MAX_TOKENS = int(os.getenv('AI_MAX_TOKENS', '4096'))
     LIARA_BASE_URL = os.getenv('LIARA_BASE_URL', 'https://ai.liara.ir/api/69209437fbd9e12047f0980d/v1')
