@@ -1,9 +1,8 @@
 """
 Resumes API Endpoints - FULLY FIXED VERSION
-✅ Fixed: Session management in background threads
-✅ Fixed: Detached instance errors
-✅ Fixed: Proper database commits
-✅ Fixed: Status update after completion
+✅ Fixed: Duplicate candidate handling (UNIQUE constraint error)
+✅ Fixed: Proper status updates
+✅ Fixed: Better error handling
 """
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -14,6 +13,7 @@ import logging
 import threading
 import traceback
 import json
+import hashlib
 
 logger = logging.getLogger(__name__)
 resumes_bp = Blueprint('resumes', __name__)
@@ -68,7 +68,6 @@ def process_resume_async(resume_id, position_id):
                 # ✅ Extract data from resume
                 logger.info(f"[{thread_name}] 📄 Extracting data from: {file_path}")
                 
-                # Call extraction service (it will handle its own session)
                 extracted_data = extraction_service.extract_from_file(
                     file_path=file_path,
                     position_id=position_id
@@ -80,7 +79,7 @@ def process_resume_async(resume_id, position_id):
                 logger.info(f"[{thread_name}] ✅ Data extracted successfully")
                 logger.info(f"[{thread_name}] 👤 Candidate: {extracted_data.get('full_name', 'Unknown')}")
                 
-                # ✅ Update candidate in SAME session
+                # ✅ Update candidate with extracted phone
                 candidate = db.query(Candidate).filter_by(id=candidate_id).first()
                 if not candidate:
                     raise ValueError(f"Candidate {candidate_id} not found")
@@ -90,8 +89,17 @@ def process_resume_async(resume_id, position_id):
                     candidate.full_name = extracted_data['full_name']
                 if extracted_data.get('email'):
                     candidate.email = extracted_data['email'] or ""
-                if extracted_data.get('phone'):
-                    candidate.phone = extracted_data['phone'] or candidate.phone
+                
+                # ✅ CRITICAL: Handle phone update carefully
+                extracted_phone = extracted_data.get('phone')
+                if extracted_phone and extracted_phone != candidate.phone:
+                    # Check if new phone already exists
+                    existing = db.query(Candidate).filter_by(phone=extracted_phone).first()
+                    if existing and existing.id != candidate_id:
+                        logger.warning(f"[{thread_name}] Phone {extracted_phone} already exists for candidate {existing.id}")
+                        # Keep temporary phone, don't update
+                    else:
+                        candidate.phone = extracted_phone
                 
                 candidate.last_updated = datetime.utcnow()
                 db.commit()
@@ -244,7 +252,7 @@ from database.models import Resume, Position, Candidate, ResumeData, Score, Resu
 @resumes_bp.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_resume():
-    """Upload and process a resume"""
+    """✅ FIXED: Upload and process a resume with proper duplicate handling"""
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
@@ -278,9 +286,13 @@ def upload_resume():
                 os.remove(filepath)
                 return jsonify({'success': False, 'message': 'Position not found'}), 404
             
-            # Create temporary candidate
-            import hashlib
-            temp_phone = f"09{hashlib.md5(filename.encode()).hexdigest()[:9]}"
+            # ✅ CRITICAL FIX: Create temporary phone that's guaranteed unique
+            temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}".encode()).hexdigest()[:15]}"
+            
+            # ✅ Double-check uniqueness
+            while db.query(Candidate).filter_by(phone=temp_phone).first():
+                temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}{os.urandom(8)}".encode()).hexdigest()[:15]}"
+            
             candidate = Candidate(
                 phone=temp_phone,
                 full_name="Processing...",
@@ -358,7 +370,7 @@ def upload_resume():
 @resumes_bp.route('/<int:resume_id>/status', methods=['GET'])
 @jwt_required()
 def get_resume_status(resume_id):
-    """Get resume processing status"""
+    """✅ Get resume processing status"""
     try:
         with get_db_session() as db:
             resume = db.query(Resume).filter_by(id=resume_id).first()
