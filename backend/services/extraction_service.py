@@ -1,8 +1,8 @@
 """
 Resume Data Extraction Service - FULLY FIXED
-✅ Fixed: Better error handling
-✅ Fixed: Improved phone validation
-✅ Fixed: Better JSON parsing
+✅ Fixed: Database session detachment
+✅ Fixed: File path handling
+✅ Fixed: Proper data extraction
 """
 import json
 import logging
@@ -70,14 +70,18 @@ Return ONLY valid JSON, no markdown."""
     
     def extract_from_file(self, file_path: str, position_id: int) -> Dict[str, Any]:
         """
-        ✅ FIXED: Extract data with better error handling
+        ✅ FIXED: Extract data - Fixed session detachment issue
         """
         try:
             from database.db import get_db_session
-            from database.models import Position
+            from database.models import Position, Criterion
             from services.ai_service import ai_service
             
             logger.info(f"📄 Starting extraction for: {file_path}")
+            
+            # ✅ FIX 1: Get all data we need from database FIRST
+            position_title = None
+            criteria_list = []
             
             with get_db_session() as db:
                 position = db.query(Position).filter_by(id=position_id).first()
@@ -85,41 +89,60 @@ Return ONLY valid JSON, no markdown."""
                 if not position:
                     raise ValueError(f"Position {position_id} not found")
                 
-                # Build criteria list
-                criteria_list = []
-                for criterion in position.criteria:
-                    criteria_list.append(f"- {criterion.criterion_name} ({criterion.criterion_key})")
+                # ✅ CRITICAL: Extract string values INSIDE the session
+                position_title = str(position.title)  # Convert to string immediately
                 
-                criteria_text = "\n".join(criteria_list) if criteria_list else "No specific criteria"
+                # Get criteria
+                criteria = db.query(Criterion).filter_by(position_id=position_id).order_by(Criterion.display_order).all()
                 
-                prompt = f"""Position: {position.title}
+                # ✅ CRITICAL: Extract all criterion data INSIDE the session
+                for criterion in criteria:
+                    criteria_list.append({
+                        'name': str(criterion.criterion_name),
+                        'key': str(criterion.criterion_key)
+                    })
+            
+            # Now session is closed but we have all the data we need
+            
+            # ✅ FIX 2: Build criteria text
+            criteria_text = "\n".join([f"- {c['name']} ({c['key']})" for c in criteria_list]) if criteria_list else "No specific criteria"
+            
+            # ✅ FIX 3: Build final prompt (outside session)
+            final_prompt = f"""Position: {position_title}
 
-Required Information:
+Required Information to Extract:
 {criteria_text}
 
-{self.prompt_template}"""
-                
-                # Call AI service
-                logger.info(f"🤖 Calling AI service for extraction...")
-                ai_response = ai_service.analyze_resume(file_path, prompt)
-                
-                if not ai_response:
-                    raise ValueError("AI service returned empty response")
-                
-                logger.info(f"✅ AI response received ({len(ai_response)} chars)")
-                
-                # Parse response
-                extracted_data = self._parse_ai_response(ai_response)
-                
-                # Normalize data
-                extracted_data = self._normalize_data(extracted_data)
-                
-                # Validate
-                self._validate_extracted_data(extracted_data)
-                
-                logger.info(f"✅ Extraction completed for: {extracted_data.get('full_name', 'Unknown')}")
-                
-                return extracted_data
+{self.prompt_template}
+
+IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
+            
+            logger.info(f"🤖 Calling AI service for extraction...")
+            logger.info(f"📂 File: {file_path}")
+            logger.info(f"📏 File exists: {Path(file_path).exists()}")
+            logger.info(f"📏 File size: {Path(file_path).stat().st_size if Path(file_path).exists() else 'N/A'}")
+            
+            # ✅ FIX 4: Call AI service
+            ai_response = ai_service.analyze_resume(file_path, final_prompt)
+            
+            if not ai_response:
+                raise ValueError("AI service returned empty response")
+            
+            logger.info(f"✅ AI response received ({len(ai_response)} chars)")
+            logger.info(f"📄 Response preview: {ai_response[:200]}...")
+            
+            # Parse response
+            extracted_data = self._parse_ai_response(ai_response)
+            
+            # Normalize data
+            extracted_data = self._normalize_data(extracted_data)
+            
+            # Validate
+            self._validate_extracted_data(extracted_data)
+            
+            logger.info(f"✅ Extraction completed for: {extracted_data.get('full_name', 'Unknown')}")
+            
+            return extracted_data
                 
         except Exception as e:
             logger.error(f"❌ Extraction error: {str(e)}")
@@ -146,12 +169,12 @@ Required Information:
             # Parse JSON
             data = json.loads(response)
             
-            logger.info(f"✅ JSON parsed successfully")
+            logger.info(f"✅ JSON parsed successfully - Keys: {list(data.keys())}")
             return data
             
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON parse error: {str(e)}")
-            logger.error(f"Response preview: {response[:200]}...")
+            logger.error(f"Response full text:\n{response}")
             raise ValueError(f"Invalid JSON from AI: {str(e)}")
     
     def _normalize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:

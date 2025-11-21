@@ -86,7 +86,19 @@ def serve_assets(path):
     except Exception as e:
         logger.error(f"Error serving asset {path}: {e}")
         return jsonify({'error': 'Asset not found'}), 404
+# ... existing imports ...
 
+# Add this route before the catch-all route
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    """Serve uploaded files for AI processing"""
+    try:
+        upload_dir = os.path.join(app.root_path, '..', 'frontend', 'uploads')
+        return send_from_directory(upload_dir, filename)
+    except Exception as e:
+        logger.error(f"Error serving upload: {e}")
+        return jsonify({'error': 'File not found'}), 404
+    
 @app.route('/<path:path>')
 def serve_static(path):
     """

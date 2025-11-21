@@ -3,6 +3,7 @@ Resumes API Endpoints - FULLY FIXED VERSION
 ✅ Fixed: Session management in background threads
 ✅ Fixed: Detached instance errors
 ✅ Fixed: Proper database commits
+✅ Fixed: Status update after completion
 """
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -28,9 +29,9 @@ def allowed_file(filename):
 
 def process_resume_async(resume_id, position_id):
     """
-    ✅ FIXED: Process resume in background thread with proper session management
+    ✅ FIXED: Process resume in background thread
     """
-    from database.db import get_db_session, init_database
+    from database.db import get_db_session
     from database.models import Resume, Candidate, ResumeData, Score, ResumeScore, Position, Criterion
     from services.extraction_service import ExtractionService
     from services.scoring_service import ScoringEngine
@@ -39,16 +40,16 @@ def process_resume_async(resume_id, position_id):
     config = get_config()
     thread_name = threading.current_thread().name
     
-    logger.info(f"[{thread_name}] Starting AI processing for resume {resume_id}, position {position_id}")
+    logger.info(f"[{thread_name}] 🚀 Starting AI processing for resume {resume_id}, position {position_id}")
     
     try:
         # Initialize services
         extraction_service = ExtractionService()
         scoring_service = ScoringEngine()
         
-        # ✅ FIX 1: Use fresh session for entire processing
+        # ✅ Use fresh session for entire processing
         with get_db_session() as db:
-            # Load resume with immediate refresh
+            # Load resume
             resume = db.query(Resume).filter_by(id=resume_id).first()
             if not resume:
                 logger.error(f"[{thread_name}] Resume {resume_id} not found")
@@ -57,15 +58,17 @@ def process_resume_async(resume_id, position_id):
             # Update status to processing
             resume.processing_status = 'processing'
             db.commit()
-            logger.info(f"[{thread_name}] Resume {resume_id} status: processing")
+            logger.info(f"[{thread_name}] ✅ Resume {resume_id} status: processing")
             
-            # ✅ FIX 2: Get candidate_id BEFORE any commits
+            # ✅ Get candidate_id and file_path BEFORE extraction
             candidate_id = resume.candidate_id
             file_path = resume.file_path
             
             try:
-                # Extract data from resume
-                logger.info(f"[{thread_name}] Extracting data from: {file_path}")
+                # ✅ Extract data from resume
+                logger.info(f"[{thread_name}] 📄 Extracting data from: {file_path}")
+                
+                # Call extraction service (it will handle its own session)
                 extracted_data = extraction_service.extract_from_file(
                     file_path=file_path,
                     position_id=position_id
@@ -74,9 +77,10 @@ def process_resume_async(resume_id, position_id):
                 if not extracted_data:
                     raise ValueError("No data extracted from resume")
                 
-                logger.info(f"[{thread_name}] Data extracted: {extracted_data.get('full_name', 'Unknown')}")
+                logger.info(f"[{thread_name}] ✅ Data extracted successfully")
+                logger.info(f"[{thread_name}] 👤 Candidate: {extracted_data.get('full_name', 'Unknown')}")
                 
-                # ✅ FIX 3: Update candidate in SAME session
+                # ✅ Update candidate in SAME session
                 candidate = db.query(Candidate).filter_by(id=candidate_id).first()
                 if not candidate:
                     raise ValueError(f"Candidate {candidate_id} not found")
@@ -92,12 +96,13 @@ def process_resume_async(resume_id, position_id):
                 candidate.last_updated = datetime.utcnow()
                 db.commit()
                 
-                logger.info(f"[{thread_name}] Candidate {candidate_id} updated: {candidate.full_name}")
+                logger.info(f"[{thread_name}] ✅ Candidate updated: {candidate.full_name}")
                 
-                # Save extracted data
+                # ✅ Save extracted data
                 existing_data = db.query(ResumeData).filter_by(resume_id=resume_id).first()
                 if existing_data:
                     existing_data.extracted_json = extracted_data
+                    existing_data.extracted_at = datetime.utcnow()
                 else:
                     resume_data = ResumeData(
                         resume_id=resume_id,
@@ -106,14 +111,14 @@ def process_resume_async(resume_id, position_id):
                     db.add(resume_data)
                 db.commit()
                 
-                logger.info(f"[{thread_name}] Extracted data saved")
+                logger.info(f"[{thread_name}] ✅ Extracted data saved to database")
                 
-                # Get position and criteria
+                # ✅ Get position and criteria
                 position = db.query(Position).filter_by(id=position_id).first()
                 if not position:
                     raise ValueError(f"Position {position_id} not found")
                 
-                criteria = db.query(Criterion).filter_by(position_id=position_id).all()
+                criteria = db.query(Criterion).filter_by(position_id=position_id).order_by(Criterion.display_order).all()
                 if not criteria:
                     logger.warning(f"[{thread_name}] No criteria found for position {position_id}")
                     resume.processing_status = 'completed'
@@ -123,18 +128,19 @@ def process_resume_async(resume_id, position_id):
                         'timestamp': datetime.utcnow().isoformat()
                     }
                     db.commit()
+                    logger.info(f"[{thread_name}] ✅ Completed (no scoring - no criteria)")
                     return
                 
-                # Delete existing scores
+                # ✅ Delete existing scores
                 db.query(Score).filter_by(resume_id=resume_id).delete()
                 db.query(ResumeScore).filter_by(resume_id=resume_id).delete()
                 db.commit()
                 
-                logger.info(f"[{thread_name}] Calculating scores...")
+                logger.info(f"[{thread_name}] 🧮 Calculating scores for {len(criteria)} criteria...")
                 
-                # Calculate scores
+                # ✅ Calculate scores
                 individual_scores = []
-                for criterion in criteria:
+                for idx, criterion in enumerate(criteria, 1):
                     extracted_value = extracted_data.get(criterion.criterion_key)
                     
                     score_result = scoring_service.calculate_score(
@@ -159,15 +165,17 @@ def process_resume_async(resume_id, position_id):
                     db.add(score)
                     individual_scores.append(score_result)
                     
-                    logger.info(f"[{thread_name}] Scored {criterion.criterion_name}: {score_result['awarded_points']}/{score_result['max_points']}")
+                    logger.info(f"[{thread_name}] [{idx}/{len(criteria)}] {criterion.criterion_name}: {score_result['awarded_points']:.1f}/{score_result['max_points']}")
                 
-                # Calculate aggregate score
+                # ✅ Calculate aggregate score
                 aggregate_result = scoring_service.calculate_aggregate_score(
                     individual_scores,
                     threshold_percentage=position.threshold_percentage or 75
                 )
                 
-                # Save aggregate score
+                logger.info(f"[{thread_name}] 📊 Aggregate Score: {aggregate_result['percentage']:.2f}% - Status: {aggregate_result['status']}")
+                
+                # ✅ Save aggregate score
                 resume_score = ResumeScore(
                     resume_id=resume_id,
                     total_score=aggregate_result['total_score'],
@@ -178,7 +186,7 @@ def process_resume_async(resume_id, position_id):
                 )
                 db.add(resume_score)
                 
-                # Save AI analysis
+                # ✅ Save AI analysis
                 resume.ai_analysis_json = {
                     'extracted_data': extracted_data,
                     'aggregate_score': aggregate_result,
@@ -186,11 +194,11 @@ def process_resume_async(resume_id, position_id):
                     'timestamp': datetime.utcnow().isoformat()
                 }
                 
-                # ✅ FIX 4: Mark as completed
+                # ✅ Mark as completed
                 resume.processing_status = 'completed'
                 db.commit()
                 
-                logger.info(f"[{thread_name}] ✅ Resume {resume_id} processing completed - Score: {aggregate_result['percentage']}%")
+                logger.info(f"[{thread_name}] ✅✅✅ Resume {resume_id} processing COMPLETED - Score: {aggregate_result['percentage']:.2f}%")
                 
             except Exception as process_error:
                 logger.error(f"[{thread_name}] ❌ Processing error: {str(process_error)}")
@@ -200,12 +208,13 @@ def process_resume_async(resume_id, position_id):
                 resume.processing_status = 'failed'
                 resume.ai_analysis_json = {
                     'error': str(process_error),
+                    'error_type': type(process_error).__name__,
                     'timestamp': datetime.utcnow().isoformat()
                 }
                 db.commit()
                 
     except Exception as fatal_error:
-        logger.error(f"[{thread_name}] ❌ Fatal error: {str(fatal_error)}")
+        logger.error(f"[{thread_name}] ❌❌❌ FATAL ERROR: {str(fatal_error)}")
         logger.error(traceback.format_exc())
         
         # Try to mark as failed in new session
@@ -219,13 +228,14 @@ def process_resume_async(resume_id, position_id):
                     resume.processing_status = 'failed'
                     resume.ai_analysis_json = {
                         'error': str(fatal_error),
+                        'error_type': type(fatal_error).__name__,
                         'timestamp': datetime.utcnow().isoformat()
                     }
                     db.commit()
         except Exception as final_error:
             logger.error(f"[{thread_name}] Could not update resume status: {str(final_error)}")
 
-
+            
 # Import at module level
 from database.db import get_db_session
 from database.models import Resume, Position, Candidate, ResumeData, Score, ResumeScore, AuditLog
@@ -259,7 +269,7 @@ def upload_resume():
         file.save(filepath)
         
         file_size = os.path.getsize(filepath)
-        logger.info(f"File saved: {filename} ({file_size} bytes)")
+        logger.info(f"📁 File saved: {filename} ({file_size} bytes)")
         
         with get_db_session() as db:
             # Verify position
@@ -269,7 +279,8 @@ def upload_resume():
                 return jsonify({'success': False, 'message': 'Position not found'}), 404
             
             # Create temporary candidate
-            temp_phone = f"temp_{os.urandom(5).hex()}"
+            import hashlib
+            temp_phone = f"09{hashlib.md5(filename.encode()).hexdigest()[:9]}"
             candidate = Candidate(
                 phone=temp_phone,
                 full_name="Processing...",
@@ -339,7 +350,7 @@ def upload_resume():
             }), 201
             
     except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
+        logger.error(f"❌ Upload error: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({'success': False, 'message': str(e)}), 500
 
@@ -374,7 +385,7 @@ def get_resume_status(resume_id):
             })
             
     except Exception as e:
-        logger.error(f"Error getting status: {str(e)}")
+        logger.error(f"❌ Error getting status: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -410,7 +421,7 @@ def get_resume(resume_id):
             })
             
     except Exception as e:
-        logger.error(f"Error getting resume: {str(e)}")
+        logger.error(f"❌ Error getting resume: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -455,7 +466,7 @@ def list_resumes():
             })
             
     except Exception as e:
-        logger.error(f"Error listing resumes: {str(e)}")
+        logger.error(f"❌ Error listing resumes: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
@@ -488,5 +499,5 @@ def delete_resume(resume_id):
             return jsonify({'success': True, 'message': 'Resume deleted'})
             
     except Exception as e:
-        logger.error(f"Error deleting resume: {str(e)}")
+        logger.error(f"❌ Error deleting resume: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
