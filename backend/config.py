@@ -32,7 +32,7 @@ class Config:
     AI_MODEL = os.getenv('AI_MODEL', 'claude-sonnet-4-20250514')
     AI_TEMPERATURE = float(os.getenv('AI_TEMPERATURE', '0.1'))
     AI_MAX_TOKENS = int(os.getenv('AI_MAX_TOKENS', '4096'))
-    LIARA_BASE_URL = os.getenv('LIARA_BASE_URL', 'https://ai.liara.ir/api/691b14f6bea7d945b6a2224e/v1')
+    LIARA_BASE_URL = os.getenv('LIARA_BASE_URL', 'https://ai.liara.ir/api/69209437fbd9e12047f0980d/v1')
     
     # File Upload
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB
