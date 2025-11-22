@@ -1,10 +1,9 @@
 """
-Resumes API Endpoints - FULLY FIXED VERSION
-✅ Fixed: Duplicate candidate handling (UNIQUE constraint error)
-✅ Fixed: Proper status updates
-✅ Fixed: Better error handling
+Resumes API Endpoints - FINAL FIXED VERSION
+✅ Fixed: Status ACTUALLY updates to 'completed' 
+✅ Fixed: Proper session handling
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -29,7 +28,7 @@ def allowed_file(filename):
 
 def process_resume_async(resume_id, position_id):
     """
-    ✅ FIXED: Process resume in background thread
+    ✅ FINAL FIX: Process resume with GUARANTEED status update
     """
     from database.db import get_db_session
     from database.models import Resume, Candidate, ResumeData, Score, ResumeScore, Position, Criterion
@@ -47,57 +46,53 @@ def process_resume_async(resume_id, position_id):
         extraction_service = ExtractionService()
         scoring_service = ScoringEngine()
         
-        # ✅ Use fresh session for entire processing
+        # ✅ Step 1: Update to processing
         with get_db_session() as db:
-            # Load resume
             resume = db.query(Resume).filter_by(id=resume_id).first()
             if not resume:
                 logger.error(f"[{thread_name}] Resume {resume_id} not found")
                 return
             
-            # Update status to processing
             resume.processing_status = 'processing'
             db.commit()
-            logger.info(f"[{thread_name}] ✅ Resume {resume_id} status: processing")
-            
-            # ✅ Get candidate_id and file_path BEFORE extraction
+            logger.info(f"[{thread_name}] ✅ Status: processing")
+        
+        # ✅ Step 2: Get file path
+        with get_db_session() as db:
+            resume = db.query(Resume).filter_by(id=resume_id).first()
             candidate_id = resume.candidate_id
             file_path = resume.file_path
+        
+        try:
+            # ✅ Step 3: Extract data
+            logger.info(f"[{thread_name}] 📄 Extracting data from: {file_path}")
             
-            try:
-                # ✅ Extract data from resume
-                logger.info(f"[{thread_name}] 📄 Extracting data from: {file_path}")
-                
-                extracted_data = extraction_service.extract_from_file(
-                    file_path=file_path,
-                    position_id=position_id
-                )
-                
-                if not extracted_data:
-                    raise ValueError("No data extracted from resume")
-                
-                logger.info(f"[{thread_name}] ✅ Data extracted successfully")
-                logger.info(f"[{thread_name}] 👤 Candidate: {extracted_data.get('full_name', 'Unknown')}")
-                
-                # ✅ Update candidate with extracted phone
+            extracted_data = extraction_service.extract_from_file(
+                file_path=file_path,
+                position_id=position_id
+            )
+            
+            if not extracted_data:
+                raise ValueError("No data extracted from resume")
+            
+            logger.info(f"[{thread_name}] ✅ Data extracted: {extracted_data.get('full_name', 'Unknown')}")
+            
+            # ✅ Step 4: Update candidate
+            with get_db_session() as db:
                 candidate = db.query(Candidate).filter_by(id=candidate_id).first()
                 if not candidate:
                     raise ValueError(f"Candidate {candidate_id} not found")
                 
-                # Update candidate info
                 if extracted_data.get('full_name'):
                     candidate.full_name = extracted_data['full_name']
                 if extracted_data.get('email'):
                     candidate.email = extracted_data['email'] or ""
                 
-                # ✅ CRITICAL: Handle phone update carefully
                 extracted_phone = extracted_data.get('phone')
                 if extracted_phone and extracted_phone != candidate.phone:
-                    # Check if new phone already exists
                     existing = db.query(Candidate).filter_by(phone=extracted_phone).first()
                     if existing and existing.id != candidate_id:
-                        logger.warning(f"[{thread_name}] Phone {extracted_phone} already exists for candidate {existing.id}")
-                        # Keep temporary phone, don't update
+                        logger.warning(f"[{thread_name}] Phone {extracted_phone} exists for candidate {existing.id}")
                     else:
                         candidate.phone = extracted_phone
                 
@@ -105,8 +100,11 @@ def process_resume_async(resume_id, position_id):
                 db.commit()
                 
                 logger.info(f"[{thread_name}] ✅ Candidate updated: {candidate.full_name}")
+            
+            # ✅ Step 5: Save extracted data
+            with get_db_session() as db:
+                resume = db.query(Resume).filter_by(id=resume_id).first()
                 
-                # ✅ Save extracted data
                 existing_data = db.query(ResumeData).filter_by(resume_id=resume_id).first()
                 if existing_data:
                     existing_data.extracted_json = extracted_data
@@ -119,34 +117,37 @@ def process_resume_async(resume_id, position_id):
                     db.add(resume_data)
                 db.commit()
                 
-                logger.info(f"[{thread_name}] ✅ Extracted data saved to database")
-                
-                # ✅ Get position and criteria
+                logger.info(f"[{thread_name}] ✅ Extracted data saved")
+            
+            # ✅ Step 6: Get position and criteria
+            with get_db_session() as db:
                 position = db.query(Position).filter_by(id=position_id).first()
                 if not position:
                     raise ValueError(f"Position {position_id} not found")
                 
                 criteria = db.query(Criterion).filter_by(position_id=position_id).order_by(Criterion.display_order).all()
+                
                 if not criteria:
-                    logger.warning(f"[{thread_name}] No criteria found for position {position_id}")
+                    logger.warning(f"[{thread_name}] No criteria for position {position_id}")
+                    resume = db.query(Resume).filter_by(id=resume_id).first()
                     resume.processing_status = 'completed'
                     resume.ai_analysis_json = {
                         'extracted_data': extracted_data,
-                        'message': 'No criteria defined for scoring',
+                        'message': 'No criteria defined',
                         'timestamp': datetime.utcnow().isoformat()
                     }
                     db.commit()
-                    logger.info(f"[{thread_name}] ✅ Completed (no scoring - no criteria)")
+                    logger.info(f"[{thread_name}] ✅ Completed (no criteria)")
                     return
                 
-                # ✅ Delete existing scores
+                # ✅ Step 7: Delete old scores
                 db.query(Score).filter_by(resume_id=resume_id).delete()
                 db.query(ResumeScore).filter_by(resume_id=resume_id).delete()
                 db.commit()
                 
                 logger.info(f"[{thread_name}] 🧮 Calculating scores for {len(criteria)} criteria...")
                 
-                # ✅ Calculate scores
+                # ✅ Step 8: Calculate scores
                 individual_scores = []
                 for idx, criterion in enumerate(criteria, 1):
                     extracted_value = extracted_data.get(criterion.criterion_key)
@@ -175,15 +176,15 @@ def process_resume_async(resume_id, position_id):
                     
                     logger.info(f"[{thread_name}] [{idx}/{len(criteria)}] {criterion.criterion_name}: {score_result['awarded_points']:.1f}/{score_result['max_points']}")
                 
-                # ✅ Calculate aggregate score
+                # ✅ Step 9: Calculate aggregate
                 aggregate_result = scoring_service.calculate_aggregate_score(
                     individual_scores,
                     threshold_percentage=position.threshold_percentage or 75
                 )
                 
-                logger.info(f"[{thread_name}] 📊 Aggregate Score: {aggregate_result['percentage']:.2f}% - Status: {aggregate_result['status']}")
+                logger.info(f"[{thread_name}] 📊 Score: {aggregate_result['percentage']:.2f}% - {aggregate_result['status']}")
                 
-                # ✅ Save aggregate score
+                # ✅ Step 10: Save aggregate score
                 resume_score = ResumeScore(
                     resume_id=resume_id,
                     total_score=aggregate_result['total_score'],
@@ -194,7 +195,8 @@ def process_resume_async(resume_id, position_id):
                 )
                 db.add(resume_score)
                 
-                # ✅ Save AI analysis
+                # ✅ Step 11: Save AI analysis
+                resume = db.query(Resume).filter_by(id=resume_id).first()
                 resume.ai_analysis_json = {
                     'extracted_data': extracted_data,
                     'aggregate_score': aggregate_result,
@@ -202,34 +204,38 @@ def process_resume_async(resume_id, position_id):
                     'timestamp': datetime.utcnow().isoformat()
                 }
                 
-                # ✅ Mark as completed
+                # ✅✅✅ Step 12: CRITICAL - Update status to completed
                 resume.processing_status = 'completed'
+                
+                # Commit everything
                 db.commit()
                 
-                logger.info(f"[{thread_name}] ✅✅✅ Resume {resume_id} processing COMPLETED - Score: {aggregate_result['percentage']:.2f}%")
+                # Verify it was saved
+                db.refresh(resume)
+                logger.info(f"[{thread_name}] ✅✅✅ COMPLETED - Status: {resume.processing_status}, Score: {aggregate_result['percentage']:.2f}%")
                 
-            except Exception as process_error:
-                logger.error(f"[{thread_name}] ❌ Processing error: {str(process_error)}")
-                logger.error(traceback.format_exc())
-                
-                # Mark as failed
-                resume.processing_status = 'failed'
-                resume.ai_analysis_json = {
-                    'error': str(process_error),
-                    'error_type': type(process_error).__name__,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                db.commit()
-                
+        except Exception as process_error:
+            logger.error(f"[{thread_name}] ❌ Processing error: {str(process_error)}")
+            logger.error(traceback.format_exc())
+            
+            # Mark as failed
+            with get_db_session() as db:
+                resume = db.query(Resume).filter_by(id=resume_id).first()
+                if resume:
+                    resume.processing_status = 'failed'
+                    resume.ai_analysis_json = {
+                        'error': str(process_error),
+                        'error_type': type(process_error).__name__,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+                    db.commit()
+                    logger.info(f"[{thread_name}] Status set to: failed")
+                    
     except Exception as fatal_error:
         logger.error(f"[{thread_name}] ❌❌❌ FATAL ERROR: {str(fatal_error)}")
         logger.error(traceback.format_exc())
         
-        # Try to mark as failed in new session
         try:
-            from database.db import get_db_session
-            from database.models import Resume
-            
             with get_db_session() as db:
                 resume = db.query(Resume).filter_by(id=resume_id).first()
                 if resume:
@@ -241,9 +247,9 @@ def process_resume_async(resume_id, position_id):
                     }
                     db.commit()
         except Exception as final_error:
-            logger.error(f"[{thread_name}] Could not update resume status: {str(final_error)}")
+            logger.error(f"[{thread_name}] Could not update status: {str(final_error)}")
 
-            
+
 # Import at module level
 from database.db import get_db_session
 from database.models import Resume, Position, Candidate, ResumeData, Score, ResumeScore, AuditLog
@@ -252,7 +258,7 @@ from database.models import Resume, Position, Candidate, ResumeData, Score, Resu
 @resumes_bp.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_resume():
-    """✅ FIXED: Upload and process a resume with proper duplicate handling"""
+    """Upload and process a resume"""
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
@@ -280,16 +286,13 @@ def upload_resume():
         logger.info(f"📁 File saved: {filename} ({file_size} bytes)")
         
         with get_db_session() as db:
-            # Verify position
             position = db.query(Position).filter_by(id=position_id).first()
             if not position:
                 os.remove(filepath)
                 return jsonify({'success': False, 'message': 'Position not found'}), 404
             
-            # ✅ CRITICAL FIX: Create temporary phone that's guaranteed unique
             temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}".encode()).hexdigest()[:15]}"
             
-            # ✅ Double-check uniqueness
             while db.query(Candidate).filter_by(phone=temp_phone).first():
                 temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}{os.urandom(8)}".encode()).hexdigest()[:15]}"
             
@@ -304,7 +307,6 @@ def upload_resume():
             db.add(candidate)
             db.flush()
             
-            # Create resume
             resume = Resume(
                 candidate_id=candidate.id,
                 position_id=int(position_id),
@@ -324,7 +326,6 @@ def upload_resume():
             
             logger.info(f"✅ Resume uploaded: ID {resume_id}, Candidate ID {candidate_id}")
             
-            # Audit log
             audit = AuditLog(
                 user_id=get_jwt_identity(),
                 action='upload_resume',
@@ -336,7 +337,6 @@ def upload_resume():
             db.add(audit)
             db.commit()
             
-            # Start background processing
             thread = threading.Thread(
                 target=process_resume_async,
                 args=(resume_id, int(position_id)),
@@ -370,7 +370,7 @@ def upload_resume():
 @resumes_bp.route('/<int:resume_id>/status', methods=['GET'])
 @jwt_required()
 def get_resume_status(resume_id):
-    """✅ Get resume processing status"""
+    """Get resume processing status"""
     try:
         with get_db_session() as db:
             resume = db.query(Resume).filter_by(id=resume_id).first()
@@ -404,7 +404,7 @@ def get_resume_status(resume_id):
 @resumes_bp.route('/<int:resume_id>', methods=['GET'])
 @jwt_required()
 def get_resume(resume_id):
-    """Get full resume details"""
+    """Get full resume details with individual scores"""
     try:
         with get_db_session() as db:
             resume = db.query(Resume).filter_by(id=resume_id).first()
@@ -414,7 +414,16 @@ def get_resume(resume_id):
             candidate = db.query(Candidate).filter_by(id=resume.candidate_id).first()
             position = db.query(Position).filter_by(id=resume.position_id).first()
             resume_score = db.query(ResumeScore).filter_by(resume_id=resume_id).first()
+            
             individual_scores = db.query(Score).filter_by(resume_id=resume_id).all()
+            scores_data = []
+            for score in individual_scores:
+                score_dict = score.to_dict()
+                if score.criterion:
+                    score_dict['criterion_name'] = score.criterion.criterion_name
+                    score_dict['category'] = score.criterion.category
+                scores_data.append(score_dict)
+            
             resume_data = db.query(ResumeData).filter_by(resume_id=resume_id).first()
             
             return jsonify({
@@ -428,7 +437,7 @@ def get_resume(resume_id):
                 'candidate': candidate.to_dict() if candidate else None,
                 'position': position.to_dict() if position else None,
                 'score': resume_score.to_dict() if resume_score else None,
-                'individual_scores': [s.to_dict() for s in individual_scores],
+                'individual_scores': scores_data,
                 'extracted_data': resume_data.extracted_json if resume_data else None
             })
             
