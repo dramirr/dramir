@@ -7,23 +7,32 @@ CRITICAL INSTRUCTIONS:
 2. Extract ALL requested information
 3. Return ONLY valid JSON (no markdown, no explanations)
 4. Convert Persian/Arabic numbers to English (۱۲۳ → 123)
-5. Normalize Arabic characters to Persian (ي → ی، ك → ک)
+5. **TRANSLATE ALL TEXT TO ENGLISH** - Names, cities, companies, job titles, everything must be in English
+6. Normalize Arabic characters to Persian for translation purposes only (ي → ی، ك → ک)
+7. **CRITICAL: The output JSON must contain ONLY English text - NO Persian/Farsi/Arabic characters allowed**
+
+TRANSLATION EXAMPLES:
+- Persian name "علی رضایی" → "Ali Rezaei" (transliterate to English)
+- City "تهران" → "Tehran" (use English spelling)
+- Company "شرکت پارس" → "Pars Company" (translate to English)
+- Job title "مدیر مالی" → "Financial Manager" (translate to English)
+- Field "حسابداری" → "Accounting" (translate to English)
 
 REQUIRED OUTPUT FORMAT:
 {
-  "full_name": "REQUIRED - Full name of candidate (never null)",
+  "full_name": "REQUIRED - Full name in ENGLISH (transliterate Persian names)",
   "age": number or null,
   "gender": "Male" or "Female" or null,
-  "city": "City name" or null,
+  "city": "City name in ENGLISH (e.g., Tehran, Isfahan)" or null,
   "phone": "IMPORTANT - Mobile number only (11 digits starting with 09)" or null,
   "email": "Email address" or null,
   "education_level": "High School" or "Associate" or "Bachelors" or "Masters" or "Doctorate" or null,
-  "education_field": "Field of study" or null,
+  "education_field": "Field of study in ENGLISH (e.g., Accounting, Engineering)" or null,
   "work_experience_years": total years as number or null,
-  "last_job_title": "Most recent job title" or null,
-  "last_company": "Most recent company name" or null,
+  "last_job_title": "Most recent job title in ENGLISH (e.g., Financial Manager)" or null,
+  "last_company": "Most recent company name in ENGLISH (transliterate if needed)" or null,
   "job_stability_months": months at last job as number or null,
-  "industry_type": "Industry or sector" or null,
+  "industry_type": "Industry or sector in ENGLISH (e.g., Trading, Manufacturing)" or null,
   "responsibility_level": "Specialist" or "Supervisor" or "Manager" or null,
   "sepidar_skill": "Basic" or "Intermediate" or "Advanced" or null,
   "excel_skill": "Basic" or "Intermediate" or "Advanced" or null,
@@ -33,8 +42,8 @@ REQUIRED OUTPUT FORMAT:
   "cost_calculation_experience": true or false,
   "warehouse_experience": true or false,
   "organization_type": "Trading" or "Manufacturing" or "Services" or null,
-  "software_skills": ["List of software/tools mentioned"],
-  "summary": "Brief 2-3 sentence summary of candidate's background"
+  "software_skills": ["List of software/tools in ENGLISH"],
+  "summary": "Brief 2-3 sentence summary in ENGLISH"
 }
 
 PHONE NUMBER RULES:
@@ -49,36 +58,35 @@ SKILL LEVEL MAPPING:
 - If resume says: "پیشرفته", "عالی", "حرفه‌ای", "expert", "advanced" → Use "Advanced"
 
 EXTRACTION GUIDELINES:
-1. full_name: ALWAYS extract, NEVER return null
+1. full_name: ALWAYS extract, NEVER return null, ALWAYS in ENGLISH (transliterate Persian names)
 2. phone: Must be mobile (09...), ignore landlines
 3. age: Calculate from birth date if provided, or extract directly
 4. work_experience_years: Sum total years across all jobs
 5. job_stability_months: Duration at most recent job only
 6. english_level: Convert descriptions to percentage (Beginner=20, Intermediate=50, Advanced=80, Fluent=100)
 7. boolean fields: true if mentioned/present, false if not mentioned
-8. software_skills: Extract all software/tools mentioned (Excel, Sepidar, SAP, etc.)
+8. software_skills: Extract all software/tools mentioned (Excel, Sepidar, SAP, etc.) in ENGLISH
+9. ALL TEXT FIELDS: Must be in English - translate from Persian/Farsi if needed
 
 DATA QUALITY RULES:
 - Only extract information that is clearly present
 - Do not infer or assume information
 - Use exact skill level terms: "Basic", "Intermediate", "Advanced"
 - Convert all numbers to English format
-- Normalize all Persian text properly
+- **TRANSLATE all Persian/Farsi text to English**
+- Transliterate Persian names to English spelling
 
 RESPONSE FORMAT:
 Return ONLY the JSON object. Do not include:
 - Markdown code blocks (```json)
 - Explanatory text before or after JSON
 - Comments or notes
-- Just the raw JSON object
+- Just the raw JSON object with ALL TEXT IN ENGLISH
 
 Example of CORRECT response:
-{"full_name": "Ali Rezaei", "age": 28, "phone": "09121234567", ...}
+{"full_name": "Ali Rezaei", "age": 28, "phone": "09121234567", "city": "Tehran", "last_company": "Pars Trading Company", ...}
 
-Example of INCORRECT response:
-```json
-{"full_name": "Ali Rezaei", ...}
-```
-Here is the extracted data:
+Example of INCORRECT response (contains Persian text):
+{"full_name": "علی رضایی", "city": "تهران", ...}
 
-NOW ANALYZE THE RESUME FILE AND RETURN THE JSON.
+NOW ANALYZE THE RESUME FILE AND RETURN THE JSON WITH ALL TEXT IN ENGLISH.
