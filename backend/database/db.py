@@ -209,7 +209,7 @@ def seed_database():
                     'is_required': True,
                     'config_json': {
                         'scoring_type': 'keyword_match',
-                        'required_keywords': ['Supervisor', 'Manager', 'Senior', 'Lead', 'سرپرست', 'مدیر'],
+                        'required_keywords': ['Supervisor', 'Manager', 'Senior', 'Lead'],
                         'match_type': 'any',
                         'description': 'حداقل دارای سمت سرپرست به بالا'
                     },
@@ -386,16 +386,16 @@ def seed_database():
                 },
                 {
                     'criterion_key': 'city',
-                    'criterion_name': 'Location (Tehran)',
+                    'criterion_name': 'Location (Baghdad)',
                     'category': 'supplementary',
                     'data_type': 'text_match',
                     'weight': 2,
                     'is_required': False,
                     'config_json': {
                         'scoring_type': 'keyword_match',
-                        'preferred_keywords': ['Tehran', 'تهران'],
+                        'preferred_keywords': ['Baghdad', 'بغداد'],
                         'match_type': 'any',
-                        'description': 'تهران'
+                        'description': 'بغداد'
                     },
                     'display_order': 15
                 },

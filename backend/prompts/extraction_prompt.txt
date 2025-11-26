@@ -13,7 +13,7 @@ CRITICAL INSTRUCTIONS:
 
 TRANSLATION EXAMPLES:
 - Persian name "علی رضایی" → "Ali Rezaei" (transliterate to English)
-- City "تهران" → "Tehran" (use English spelling)
+- City "بغداد" → "Baghdad" (use English spelling)
 - Company "شرکت پارس" → "Pars Company" (translate to English)
 - Job title "مدیر مالی" → "Financial Manager" (translate to English)
 - Field "حسابداری" → "Accounting" (translate to English)
@@ -23,7 +23,7 @@ REQUIRED OUTPUT FORMAT:
   "full_name": "REQUIRED - Full name in ENGLISH (transliterate Persian names)",
   "age": number or null,
   "gender": "Male" or "Female" or null,
-  "city": "City name in ENGLISH (e.g., Tehran, Isfahan)" or null,
+  "city": "City name in ENGLISH (e.g., Baghdad)" or null,
   "phone": "IMPORTANT - Mobile number only (11 digits starting with 09)" or null,
   "email": "Email address" or null,
   "education_level": "High School" or "Associate" or "Bachelors" or "Masters" or "Doctorate" or null,
@@ -84,9 +84,9 @@ Return ONLY the JSON object. Do not include:
 - Just the raw JSON object with ALL TEXT IN ENGLISH
 
 Example of CORRECT response:
-{"full_name": "Ali Rezaei", "age": 28, "phone": "09121234567", "city": "Tehran", "last_company": "Pars Trading Company", ...}
+{"full_name": "Ali Rezaei", "age": 28, "phone": "09121234567", "city": "Baghdad", "last_company": "Pars Trading Company", ...}
 
 Example of INCORRECT response (contains Persian text):
-{"full_name": "علی رضایی", "city": "تهران", ...}
+{"full_name": "علی رضایی", "city": "بغداد", ...}
 
 NOW ANALYZE THE RESUME FILE AND RETURN THE JSON WITH ALL TEXT IN ENGLISH.
