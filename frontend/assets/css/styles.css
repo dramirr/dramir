@@ -355,16 +355,6 @@ tbody tr:hover {
     display: inline-block;
 }
 
-.status-qualified {
-    background: rgba(16, 185, 129, 0.2);
-    color: var(--success);
-}
-
-.status-rejected {
-    background: rgba(239, 68, 68, 0.2);
-    color: var(--error);
-}
-
 .alert {
     padding: 15px 20px;
     border-radius: 8px;
@@ -497,6 +487,16 @@ tbody tr:hover {
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
 
+/* Results Table Styling */
+.results-table {
+    margin-top: 20px;
+}
+
+.results-table table {
+    width: 100%;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
@@ -518,5 +518,9 @@ tbody tr:hover {
     
     .filters .form-control {
         width: 100%;
+    }
+    
+    .manual-inputs {
+        grid-template-columns: 1fr !important;
     }
 }

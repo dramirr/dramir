@@ -1,5 +1,5 @@
 // ===================================
-// FIXED app.js with Beautiful Score Popup
+// COMPLETE app.js with Beautiful Score Range Filter
 // ===================================
 
 let uploadMode = 'single';
@@ -7,6 +7,15 @@ let currentPositions = [];
 let currentResumes = [];
 let currentCandidates = [];
 let activePollingIntervals = new Map();
+
+// ✅ NEW: Global filter state for Results tab
+let resultsFilters = {
+    position_id: '',
+    status: 'all',
+    score_min: 0,
+    score_max: 100,
+    urgency: 50  // 0-100, where higher = lower score threshold (more urgent = accept lower scores)
+};
 
 // ===================================
 // 1. TAB MANAGEMENT
@@ -19,7 +28,10 @@ function switchTab(tabName) {
     document.getElementById(tabName).classList.add('active');
     
     if (tabName === 'dashboard') loadDashboard();
-    if (tabName === 'results') loadResults();
+    if (tabName === 'results') {
+        loadPositions(); // Ensure positions are loaded for filter
+        loadResults();
+    }
     if (tabName === 'candidates') loadCandidates();
     if (tabName === 'positions') loadPositionsList();
 }
@@ -52,16 +64,30 @@ async function loadPositions() {
         const data = await api.getPositions();
         currentPositions = data.positions;
         
-        const selects = document.querySelectorAll('#positionSelect, #filterPosition');
-        selects.forEach(select => {
-            select.innerHTML = '<option value="">Select position...</option>';
+        // Update upload position select
+        const uploadSelect = document.getElementById('positionSelect');
+        if (uploadSelect) {
+            uploadSelect.innerHTML = '<option value="">Select position...</option>';
             data.positions.forEach(pos => {
                 const option = document.createElement('option');
                 option.value = pos.id;
                 option.textContent = pos.title;
-                select.appendChild(option);
+                uploadSelect.appendChild(option);
             });
-        });
+        }
+        
+        // ✅ FIXED: Update results filter position select
+        const filterSelect = document.getElementById('filterPosition');
+        if (filterSelect) {
+            filterSelect.innerHTML = '<option value="">All Positions</option>';
+            data.positions.forEach(pos => {
+                const option = document.createElement('option');
+                option.value = pos.id;
+                option.textContent = pos.title;
+                filterSelect.appendChild(option);
+            });
+        }
+        
     } catch (error) {
         console.error('Failed to load positions:', error);
         showNotification('Failed to load positions', 'error');
@@ -336,22 +362,50 @@ async function loadDashboard() {
 }
 
 // ===================================
-// 7. LOAD RESULTS
+// 7. LOAD RESULTS WITH FILTERS
 // ===================================
 async function loadResults() {
     try {
-        const filterPosition = document.getElementById('filterPosition')?.value;
+        // Build filter object
         const filters = {};
-        if (filterPosition) filters.position_id = filterPosition;
+        
+        // ✅ FIXED: Get position filter
+        const positionSelect = document.getElementById('filterPosition');
+        if (positionSelect && positionSelect.value) {
+            filters.position_id = positionSelect.value;
+            resultsFilters.position_id = positionSelect.value;
+        }
+        
+        // ✅ FIXED: Get status filter (THIS WAS MISSING!)
+        const statusSelect = document.getElementById('filterStatus');
+        if (statusSelect && statusSelect.value && statusSelect.value !== 'all') {
+            filters.status = statusSelect.value;
+            resultsFilters.status = statusSelect.value;
+        }
+        
+        // ✅ NEW: Add score range filters
+        filters.score_min = resultsFilters.score_min;
+        filters.score_max = resultsFilters.score_max;
+        
+        console.log('Filters being applied:', filters);
         
         const data = await api.getResumes(filters);
-        currentResumes = data.resumes || [];
+        let resumes = data.resumes || [];
+        
+        // ✅ Filter by score range on frontend (if backend doesn't support it)
+        resumes = resumes.filter(resume => {
+            if (!resume.score) return true; // Include processing resumes
+            return resume.score.percentage >= filters.score_min && 
+                   resume.score.percentage <= filters.score_max;
+        });
+        
+        currentResumes = resumes;
         
         const tableDiv = document.getElementById('resultsTable');
         if (!tableDiv) return;
         
         if (currentResumes.length === 0) {
-            tableDiv.innerHTML = '<p>No resumes found</p>';
+            tableDiv.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-secondary);">No resumes found matching the filters</p>';
             return;
         }
         
@@ -371,16 +425,15 @@ async function loadResults() {
         `;
         
         currentResumes.forEach(resume => {
+            const scoreDisplay = resume.score 
+                ? `<span class="score-badge ${resume.score.status}">${resume.score.percentage.toFixed(1)}%</span>`
+                : '<span class="score-badge pending">Pending</span>';
+            
             tableHTML += `
                 <tr>
                     <td>${resume.candidate?.full_name || 'Processing...'}</td>
                     <td>${resume.position?.title || 'N/A'}</td>
-                    <td>
-                        ${resume.score ? 
-                            `<span class="score-badge ${resume.score.status}">${resume.score.percentage.toFixed(1)}%</span>` : 
-                            '<span class="score-badge pending">Pending</span>'
-                        }
-                    </td>
+                    <td>${scoreDisplay}</td>
                     <td>
                         <span class="status-badge status-${resume.processing_status}">
                             ${resume.processing_status}
@@ -388,7 +441,7 @@ async function loadResults() {
                     </td>
                     <td>${new Date(resume.uploaded_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="btn-sm btn-primary" onclick="viewResumeDetails(${resume.id})">View Details</button>
+                        <button class="btn-sm btn-primary" onclick="viewResumeDetails(${resume.id})">View</button>
                     </td>
                 </tr>
             `;
@@ -408,7 +461,255 @@ async function loadResults() {
 }
 
 // ===================================
-// 8. VIEW RESUME DETAILS WITH POPUP
+// 8. ✅ NEW: SCORE RANGE FILTER WITH URGENCY SLIDER
+// ===================================
+function initializeScoreRangeFilter() {
+    const filterContainer = document.getElementById('scoreRangeFilterContainer');
+    if (!filterContainer) return;
+    
+    filterContainer.innerHTML = `
+        <div class="score-range-filter">
+            <div class="filter-header">
+                <h3>🎯 Score Range Filter</h3>
+                <p class="filter-subtitle">Adjust urgency level or set custom score range</p>
+            </div>
+            
+            <!-- Urgency Slider Section -->
+            <div class="urgency-section">
+                <div class="urgency-header">
+                    <label>⚡ Urgency Level</label>
+                    <span class="urgency-value" id="urgencyValue">Medium</span>
+                </div>
+                <div class="urgency-slider-container">
+                    <div class="urgency-label">Low</div>
+                    <input 
+                        type="range" 
+                        id="urgencySlider" 
+                        min="0" 
+                        max="100" 
+                        value="50"
+                        class="urgency-slider"
+                        oninput="updateUrgencyFilter()"
+                    >
+                    <div class="urgency-label">High</div>
+                </div>
+                <div class="urgency-description" id="urgencyDescription">
+                    Medium urgency: Accept candidates with 40-100% score
+                </div>
+                
+                <!-- Visual indicator of current range -->
+                <div class="score-range-display">
+                    <div class="range-bar">
+                        <div class="range-fill" id="rangeFill"></div>
+                    </div>
+                    <div class="range-labels">
+                        <span>0%</span>
+                        <span id="currentMinScore">40</span>% - <span id="currentMaxScore">100</span>%
+                        <span>100%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- OR Divider -->
+            <div class="filter-divider">
+                <span>OR</span>
+            </div>
+            
+            <!-- Manual Score Range Section -->
+            <div class="manual-range-section">
+                <label class="manual-label">
+                    <input type="checkbox" id="manualRangeToggle" onchange="toggleManualRange()">
+                    Set Custom Score Range
+                </label>
+                
+                <div class="manual-inputs" id="manualInputs" style="display: none;">
+                    <div class="range-input-group">
+                        <label>Minimum Score</label>
+                        <div class="input-with-unit">
+                            <input 
+                                type="range" 
+                                id="minScoreSlider" 
+                                min="0" 
+                                max="100" 
+                                value="40"
+                                class="score-slider"
+                                oninput="updateManualRange()"
+                            >
+                            <input 
+                                type="number" 
+                                id="minScoreInput" 
+                                min="0" 
+                                max="100" 
+                                value="40"
+                                class="score-input"
+                                onchange="updateManualRange()"
+                            >
+                            <span class="unit">%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="range-input-group">
+                        <label>Maximum Score</label>
+                        <div class="input-with-unit">
+                            <input 
+                                type="range" 
+                                id="maxScoreSlider" 
+                                min="0" 
+                                max="100" 
+                                value="100"
+                                class="score-slider"
+                                oninput="updateManualRange()"
+                            >
+                            <input 
+                                type="number" 
+                                id="maxScoreInput" 
+                                min="0" 
+                                max="100" 
+                                value="100"
+                                class="score-input"
+                                onchange="updateManualRange()"
+                            >
+                            <span class="unit">%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="filter-actions">
+                <button class="btn-primary" onclick="applyScoreFilter()">
+                    <span>✓</span> Apply Filter
+                </button>
+                <button class="btn-secondary" onclick="resetScoreFilter()">
+                    <span>↻</span> Reset
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Initialize urgency slider
+    updateUrgencyFilter();
+}
+
+function updateUrgencyFilter() {
+    const slider = document.getElementById('urgencySlider');
+    const urgency = parseInt(slider.value);
+    resultsFilters.urgency = urgency;
+    
+    // Calculate score range based on urgency
+    // Low urgency (0): Accept 75-100
+    // Medium urgency (50): Accept 40-100
+    // High urgency (100): Accept 0-100
+    const minScore = Math.max(0, 75 - (urgency * 0.75));
+    const maxScore = 100;
+    
+    resultsFilters.score_min = Math.round(minScore);
+    resultsFilters.score_max = maxScore;
+    
+    // Update display
+    const urgencyValue = document.getElementById('urgencyValue');
+    const urgencyDescription = document.getElementById('urgencyDescription');
+    
+    if (urgency < 30) {
+        urgencyValue.textContent = 'Low (Strict)';
+        urgencyDescription.textContent = '⬆️ Low urgency: Only accept high-quality candidates (75%+)';
+    } else if (urgency < 70) {
+        urgencyValue.textContent = 'Medium (Balanced)';
+        urgencyDescription.textContent = '⚖️ Medium urgency: Accept candidates with 40%+ score';
+    } else {
+        urgencyValue.textContent = 'High (Flexible)';
+        urgencyDescription.textContent = '⬇️ High urgency: Accept all candidates regardless of score';
+    }
+    
+    // Update range display
+    document.getElementById('currentMinScore').textContent = Math.round(minScore);
+    document.getElementById('currentMaxScore').textContent = maxScore;
+    
+    const rangeFill = document.getElementById('rangeFill');
+    if (rangeFill) {
+        rangeFill.style.left = (minScore) + '%';
+        rangeFill.style.right = (100 - maxScore) + '%';
+    }
+    
+    // Disable manual inputs when using urgency
+    const manualToggle = document.getElementById('manualRangeToggle');
+    if (manualToggle) {
+        manualToggle.checked = false;
+        document.getElementById('manualInputs').style.display = 'none';
+    }
+}
+
+function toggleManualRange() {
+    const manualInputs = document.getElementById('manualInputs');
+    const toggle = document.getElementById('manualRangeToggle');
+    
+    manualInputs.style.display = toggle.checked ? 'grid' : 'none';
+    
+    if (toggle.checked) {
+        // Reset urgency slider
+        document.getElementById('urgencySlider').value = 50;
+        updateUrgencyFilter();
+    }
+}
+
+function updateManualRange() {
+    const minInput = document.getElementById('minScoreInput');
+    const maxInput = document.getElementById('maxScoreInput');
+    const minSlider = document.getElementById('minScoreSlider');
+    const maxSlider = document.getElementById('maxScoreSlider');
+    
+    let minVal = parseInt(minInput.value);
+    let maxVal = parseInt(maxInput.value);
+    
+    // Sync slider and input
+    minSlider.value = minVal;
+    maxSlider.value = maxVal;
+    
+    // Ensure min < max
+    if (minVal > maxVal) {
+        minVal = maxVal;
+        minInput.value = minVal;
+        minSlider.value = minVal;
+    }
+    
+    resultsFilters.score_min = minVal;
+    resultsFilters.score_max = maxVal;
+}
+
+function applyScoreFilter() {
+    console.log('Applying score filter:', resultsFilters);
+    loadResults();
+    showNotification(`✅ Filter applied: ${resultsFilters.score_min}% - ${resultsFilters.score_max}%`, 'success');
+}
+
+function resetScoreFilter() {
+    resultsFilters.score_min = 0;
+    resultsFilters.score_max = 100;
+    resultsFilters.urgency = 50;
+    
+    document.getElementById('urgencySlider').value = 50;
+    document.getElementById('minScoreInput').value = 40;
+    document.getElementById('maxScoreInput').value = 100;
+    document.getElementById('minScoreSlider').value = 40;
+    document.getElementById('maxScoreSlider').value = 100;
+    document.getElementById('manualRangeToggle').checked = false;
+    document.getElementById('manualInputs').style.display = 'none';
+    
+    updateUrgencyFilter();
+    loadResults();
+    showNotification('✓ Filter reset', 'success');
+}
+
+// ===================================
+// 9. ✅ FIXED: FILTER RESULTS (NOW INCLUDES STATUS)
+// ===================================
+async function filterResults() {
+    console.log('Filter results called');
+    loadResults();
+}
+
+// ===================================
+// 10. VIEW RESUME DETAILS WITH POPUP
 // ===================================
 async function viewResumeDetails(resumeId) {
     try {
@@ -418,7 +719,6 @@ async function viewResumeDetails(resumeId) {
             throw new Error(data.message || 'Failed to load resume details');
         }
         
-        // ✅ Create beautiful popup
         showScorePopup(data);
         
     } catch (error) {
@@ -428,7 +728,6 @@ async function viewResumeDetails(resumeId) {
 }
 
 function showScorePopup(data) {
-    // Create modal overlay
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `
@@ -445,7 +744,6 @@ function showScorePopup(data) {
         animation: fadeIn 0.3s;
     `;
     
-    // Create modal content
     const modalContent = document.createElement('div');
     modalContent.style.cssText = `
         background: var(--bg-medium, #1e293b);
@@ -459,13 +757,11 @@ function showScorePopup(data) {
         animation: slideUp 0.3s;
     `;
     
-    // Build content
     let content = `
         <button onclick="this.closest('.modal-overlay').remove()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-secondary); line-height: 1;">×</button>
         
         <h2 style="margin: 0 0 20px 0; color: var(--primary, #3b82f6);">📊 Resume Analysis</h2>
         
-        <!-- Candidate Info -->
         <div style="background: var(--bg-dark, #0f172a); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
             <h3 style="margin: 0 0 15px 0;">👤 ${data.candidate?.full_name || 'N/A'}</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
@@ -485,7 +781,6 @@ function showScorePopup(data) {
         </div>
     `;
     
-    // Overall Score
     if (data.score) {
         const statusClass = data.score.status === 'Qualified' ? 'success' : 'error';
         const statusColor = data.score.status === 'Qualified' ? '#10b981' : '#ef4444';
@@ -511,7 +806,6 @@ function showScorePopup(data) {
         `;
     }
     
-    // Individual Scores
     if (data.individual_scores && data.individual_scores.length > 0) {
         content += `
             <div style="background: var(--bg-dark, #0f172a); padding: 25px; border-radius: 12px;">
@@ -519,7 +813,6 @@ function showScorePopup(data) {
                 <div style="display: grid; gap: 12px;">
         `;
         
-        // Group by category
         const categories = {
             'core': [],
             'supplementary': [],
@@ -535,7 +828,6 @@ function showScorePopup(data) {
             }
         });
         
-        // Display each category
         Object.entries(categories).forEach(([cat, scores]) => {
             if (scores.length === 0) return;
             
@@ -576,14 +868,12 @@ function showScorePopup(data) {
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
     
-    // Close on outside click
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.remove();
         }
     });
     
-    // Add animations
     const style = document.createElement('style');
     style.textContent = `
         @keyframes fadeIn {
@@ -599,7 +889,7 @@ function showScorePopup(data) {
 }
 
 // ===================================
-// 9. LOAD CANDIDATES
+// 11. LOAD CANDIDATES
 // ===================================
 async function loadCandidates() {
     try {
@@ -636,7 +926,7 @@ async function loadCandidates() {
 }
 
 // ===================================
-// 10. LOAD POSITIONS LIST
+// 12. LOAD POSITIONS LIST
 // ===================================
 async function loadPositionsList() {
     try {
@@ -751,10 +1041,6 @@ async function searchCandidates() {
     }
 }
 
-function filterResults() {
-    loadResults();
-}
-
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
@@ -842,3 +1128,9 @@ window.viewPositionDetails = viewPositionDetails;
 window.searchCandidates = searchCandidates;
 window.filterResults = filterResults;
 window.pollResumeStatus = pollResumeStatus;
+window.initializeScoreRangeFilter = initializeScoreRangeFilter;
+window.updateUrgencyFilter = updateUrgencyFilter;
+window.toggleManualRange = toggleManualRange;
+window.updateManualRange = updateManualRange;
+window.applyScoreFilter = applyScoreFilter;
+window.resetScoreFilter = resetScoreFilter;

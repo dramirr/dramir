@@ -134,10 +134,27 @@ const api = {
         let url = `${API_URL}/resumes`;
         const params = new URLSearchParams();
         
-        if (filters.position_id) params.append('position_id', filters.position_id);
-        if (filters.status) params.append('status', filters.status);
+        // ✅ FIXED: Properly add filters to query params
+        if (filters.position_id) {
+            params.append('position_id', filters.position_id);
+        }
         
-        if (params.toString()) url += `?${params.toString()}`;
+        // ✅ FIXED: Add status filter (this was missing!)
+        if (filters.status) {
+            params.append('status', filters.status);
+        }
+        
+        // ✅ NEW: Score range filters (note: backend may not support yet, but frontend sends it)
+        if (filters.score_min !== undefined) {
+            params.append('score_min', filters.score_min);
+        }
+        if (filters.score_max !== undefined) {
+            params.append('score_max', filters.score_max);
+        }
+        
+        if (params.toString()) {
+            url += `?${params.toString()}`;
+        }
         
         const response = await fetch(url, {
             headers: {
@@ -162,7 +179,6 @@ const api = {
         return await response.json();
     },
 
-    // CRITICAL: Add the missing getResumeStatus method
     async getResumeStatus(resumeId) {
         const response = await fetch(`${API_URL}/resumes/${resumeId}/status`, {
             headers: {
