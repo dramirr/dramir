@@ -1,7 +1,6 @@
 """
-Resumes API Endpoints - FINAL FIXED VERSION
-✅ Fixed: Status ACTUALLY updates to 'completed' 
-✅ Fixed: Proper session handling
+Resumes API Endpoints - FIXED FOR LLM-BASED SCORING
+✅ Fixed: Uses LLM for scoring instead of rule-based calculation
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -28,7 +27,7 @@ def allowed_file(filename):
 
 def process_resume_async(resume_id, position_id):
     """
-    ✅ FINAL FIX: Process resume with GUARANTEED status update
+    ✅ FIXED: Process resume with LLM-based scoring
     """
     from database.db import get_db_session
     from database.models import Resume, Candidate, ResumeData, Score, ResumeScore, Position, Criterion
@@ -119,100 +118,52 @@ def process_resume_async(resume_id, position_id):
                 
                 logger.info(f"[{thread_name}] ✅ Extracted data saved")
             
-            # ✅ Step 6: Get position and criteria
+            # ✅ Step 6: Score using LLM (NEW WAY)
+            logger.info(f"[{thread_name}] 🤖 Starting LLM-based scoring...")
+            
             with get_db_session() as db:
-                position = db.query(Position).filter_by(id=position_id).first()
-                if not position:
-                    raise ValueError(f"Position {position_id} not found")
+                # Call scoring service which uses LLM
+                scoring_result = scoring_service.score_resume(
+                    db=db,
+                    resume_id=resume_id,
+                    extracted_data=extracted_data,
+                    position_id=position_id
+                )
                 
-                criteria = db.query(Criterion).filter_by(position_id=position_id).order_by(Criterion.display_order).all()
+                logger.info(f"[{thread_name}] 🧮 Scoring completed")
                 
-                if not criteria:
-                    logger.warning(f"[{thread_name}] No criteria for position {position_id}")
-                    resume = db.query(Resume).filter_by(id=resume_id).first()
-                    resume.processing_status = 'completed'
+                # Fetch results
+                resume = db.query(Resume).filter_by(id=resume_id).first()
+                resume_score = db.query(ResumeScore).filter_by(resume_id=resume_id).first()
+                
+                if resume_score:
+                    aggregate_result = {
+                        'percentage': resume_score.percentage,
+                        'status': resume_score.status,
+                        'total_score': resume_score.total_score,
+                        'max_possible_score': resume_score.max_possible_score,
+                        'overall_assessment': resume_score.overall_assessment
+                    }
+                    
+                    logger.info(f"[{thread_name}] 📊 Score: {aggregate_result['percentage']:.2f}% - {aggregate_result['status']}")
+                    
+                    # ✅ Step 7: Save AI analysis
                     resume.ai_analysis_json = {
                         'extracted_data': extracted_data,
-                        'message': 'No criteria defined',
+                        'aggregate_score': aggregate_result,
                         'timestamp': datetime.utcnow().isoformat()
                     }
+                    
+                    # ✅ Step 8: CRITICAL - Update status to completed
+                    resume.processing_status = 'completed'
+                    
                     db.commit()
-                    logger.info(f"[{thread_name}] ✅ Completed (no criteria)")
-                    return
-                
-                # ✅ Step 7: Delete old scores
-                db.query(Score).filter_by(resume_id=resume_id).delete()
-                db.query(ResumeScore).filter_by(resume_id=resume_id).delete()
-                db.commit()
-                
-                logger.info(f"[{thread_name}] 🧮 Calculating scores for {len(criteria)} criteria...")
-                
-                # ✅ Step 8: Calculate scores
-                individual_scores = []
-                for idx, criterion in enumerate(criteria, 1):
-                    extracted_value = extracted_data.get(criterion.criterion_key)
                     
-                    score_result = scoring_service.calculate_score(
-                        criterion={
-                            'data_type': criterion.data_type,
-                            'weight': criterion.weight,
-                            'config_json': criterion.config_json or {},
-                            'criterion_key': criterion.criterion_key
-                        },
-                        extracted_value=extracted_value
-                    )
-                    
-                    score = Score(
-                        resume_id=resume_id,
-                        criterion_id=criterion.id,
-                        awarded_points=score_result['awarded_points'],
-                        max_points=score_result['max_points'],
-                        score_multiplier=score_result.get('score_multiplier', 0),
-                        extracted_value=str(extracted_value) if extracted_value is not None else None,
-                        reasoning=score_result.get('reasoning', '')
-                    )
-                    db.add(score)
-                    individual_scores.append(score_result)
-                    
-                    logger.info(f"[{thread_name}] [{idx}/{len(criteria)}] {criterion.criterion_name}: {score_result['awarded_points']:.1f}/{score_result['max_points']}")
-                
-                # ✅ Step 9: Calculate aggregate
-                aggregate_result = scoring_service.calculate_aggregate_score(
-                    individual_scores,
-                    threshold_percentage=position.threshold_percentage or 75
-                )
-                
-                logger.info(f"[{thread_name}] 📊 Score: {aggregate_result['percentage']:.2f}% - {aggregate_result['status']}")
-                
-                # ✅ Step 10: Save aggregate score
-                resume_score = ResumeScore(
-                    resume_id=resume_id,
-                    total_score=aggregate_result['total_score'],
-                    max_possible_score=aggregate_result['max_possible_score'],
-                    percentage=aggregate_result['percentage'],
-                    status=aggregate_result['status'],
-                    overall_assessment=aggregate_result.get('overall_assessment', '')
-                )
-                db.add(resume_score)
-                
-                # ✅ Step 11: Save AI analysis
-                resume = db.query(Resume).filter_by(id=resume_id).first()
-                resume.ai_analysis_json = {
-                    'extracted_data': extracted_data,
-                    'aggregate_score': aggregate_result,
-                    'individual_scores': individual_scores,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                
-                # ✅✅✅ Step 12: CRITICAL - Update status to completed
-                resume.processing_status = 'completed'
-                
-                # Commit everything
-                db.commit()
-                
-                # Verify it was saved
-                db.refresh(resume)
-                logger.info(f"[{thread_name}] ✅✅✅ COMPLETED - Status: {resume.processing_status}, Score: {aggregate_result['percentage']:.2f}%")
+                    # Verify it was saved
+                    db.refresh(resume)
+                    logger.info(f"[{thread_name}] ✅✅✅ COMPLETED - Status: {resume.processing_status}, Score: {aggregate_result['percentage']:.2f}%")
+                else:
+                    raise ValueError("Failed to calculate aggregate score")
                 
         except Exception as process_error:
             logger.error(f"[{thread_name}] ❌ Processing error: {str(process_error)}")

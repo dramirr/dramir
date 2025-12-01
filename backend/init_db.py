@@ -36,7 +36,11 @@ def main():
     
     print("\n📊 Seeding initial data...")
     seed_database()
-    print("   ✅ Default position and criteria created")
+    print("   ✅ Three positions created:")
+    print("      1. Senior Accountant Supervisor")
+    print("      2. Foreign Trade Specialist")
+    print("      3. HR Development Specialist")
+    print("   ✅ All criteria configured for Baghdad location")
     
     print("\n" + "=" * 80)
     print("✅ Database initialization complete!")
@@ -46,6 +50,7 @@ def main():
     print("   2. Run: python backend/app.py")
     print("   3. Login with admin/admin123")
     print("   4. Change default password immediately")
+    print("   5. Start uploading resumes for evaluation")
     print("\n🚀 Ready to start!")
 
 if __name__ == '__main__':

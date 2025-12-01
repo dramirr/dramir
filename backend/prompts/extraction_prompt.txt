@@ -42,6 +42,23 @@ REQUIRED OUTPUT FORMAT:
   "cost_calculation_experience": true or false,
   "warehouse_experience": true or false,
   "organization_type": "Trading" or "Manufacturing" or "Services" or null,
+  "correspondence_skill": true or false (for international business correspondence),
+  "shipping_process_knowledge": true or false (for order fulfillment and international shipping),
+  "international_communication": true or false (for foreign client communication),
+  "market_analysis_skill": true or false,
+  "negotiation_skill": true or false,
+  "teamwork_experience": true or false,
+  "recruitment_process": true or false (HR - recruitment and hiring),
+  "job_description_skill": true or false (HR - job description development),
+  "hr_analytics": true or false (HR - HR metrics and analytics),
+  "training_programs": true or false (HR - training program design),
+  "kpi_design": true or false (HR - KPI and performance metrics),
+  "hrm_software": "Basic" or "Intermediate" or "Advanced" or null,
+  "communication_counseling": true or false (HR - employee counseling),
+  "organizational_culture": true or false (HR - culture development),
+  "teamwork_cross_functional": true or false (HR - cross-functional teamwork),
+  "personality_traits": true or false (if resume shows desired traits),
+  "development_passion": true or false (HR - passion for employee development),
   "software_skills": ["List of software/tools in ENGLISH"],
   "summary": "Brief 2-3 sentence summary in ENGLISH"
 }
@@ -67,14 +84,37 @@ EXTRACTION GUIDELINES:
 7. boolean fields: true if mentioned/present, false if not mentioned
 8. software_skills: Extract all software/tools mentioned (Excel, Sepidar, SAP, etc.) in ENGLISH
 9. ALL TEXT FIELDS: Must be in English - translate from Persian/Farsi if needed
+10. responsibility_level: Extract from job history (Staff/Specialist < Supervisor < Manager)
 
 DATA QUALITY RULES:
 - Only extract information that is clearly present
-- Do not infer or assume information
+- Do not infer or assume information not explicitly stated
 - Use exact skill level terms: "Basic", "Intermediate", "Advanced"
 - Convert all numbers to English format
 - **TRANSLATE all Persian/Farsi text to English**
 - Transliterate Persian names to English spelling
+- For boolean fields, mark as "true" only if explicitly mentioned or clearly demonstrated
+
+POSITION-SPECIFIC EXTRACTION:
+For ACCOUNTING SUPERVISOR positions:
+- Focus on accounting, finance, supervisory experience
+- Look for Sepidar software, financial reports experience
+- Check for warehouse/inventory experience
+- Verify financial and accounting knowledge
+
+For FOREIGN TRADE SPECIALIST positions:
+- Focus on international trade, export-import experience
+- Verify strong English language skills
+- Look for shipping and logistics knowledge
+- Check for international communication and correspondence skills
+- Market analysis and negotiation skills are valuable
+
+For HR DEVELOPMENT SPECIALIST positions:
+- Focus on HR, training, and development experience
+- Look for recruitment, KPI design, HR analytics
+- Verify training program design and implementation
+- Check for communication and organizational culture skills
+- Employee development passion is important
 
 RESPONSE FORMAT:
 Return ONLY the JSON object. Do not include:

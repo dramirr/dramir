@@ -1,8 +1,6 @@
 """
-Resume Data Extraction Service - FULLY FIXED
-✅ Fixed: Database session detachment
-✅ Fixed: File path handling
-✅ Fixed: Proper data extraction
+Resume Data Extraction Service - Multi-Position Support
+✅ Fixed: Supports all three positions with proper extraction
 """
 import json
 import logging
@@ -37,7 +35,7 @@ class ExtractionService:
     
     def _get_default_prompt(self) -> str:
         """Default extraction prompt"""
-        return """Extract resume information and return as JSON:
+        return """Extract resume information and return as JSON in ENGLISH:
 
 {
   "full_name": "REQUIRED - Full name",
@@ -47,12 +45,12 @@ class ExtractionService:
   "phone": "Mobile (09xxxxxxxxx)"/null,
   "email": "Email"/null,
   "education_level": "High School"/"Associate"/"Bachelors"/"Masters"/"Doctorate"/null,
-  "education_field": "Field"/null,
+  "education_field": "Field in ENGLISH"/null,
   "work_experience_years": number/null,
-  "last_job_title": "Job title"/null,
-  "last_company": "Company"/null,
+  "last_job_title": "Job title in ENGLISH"/null,
+  "last_company": "Company in ENGLISH"/null,
   "job_stability_months": number/null,
-  "industry_type": "Industry"/null,
+  "industry_type": "Industry in ENGLISH"/null,
   "responsibility_level": "Specialist"/"Supervisor"/"Manager"/null,
   "sepidar_skill": "Basic"/"Intermediate"/"Advanced"/null,
   "excel_skill": "Basic"/"Intermediate"/"Advanced"/null,
@@ -62,15 +60,32 @@ class ExtractionService:
   "cost_calculation_experience": true/false,
   "warehouse_experience": true/false,
   "organization_type": "Trading"/"Manufacturing"/"Services"/null,
-  "software_skills": ["List"],
-  "summary": "Brief summary"
+  "correspondence_skill": true/false,
+  "shipping_process_knowledge": true/false,
+  "international_communication": true/false,
+  "market_analysis_skill": true/false,
+  "negotiation_skill": true/false,
+  "teamwork_experience": true/false,
+  "recruitment_process": true/false,
+  "job_description_skill": true/false,
+  "hr_analytics": true/false,
+  "training_programs": true/false,
+  "kpi_design": true/false,
+  "hrm_software": "Basic"/"Intermediate"/"Advanced"/null,
+  "communication_counseling": true/false,
+  "organizational_culture": true/false,
+  "teamwork_cross_functional": true/false,
+  "personality_traits": true/false,
+  "development_passion": true/false,
+  "software_skills": ["List of tools"],
+  "summary": "Brief summary in ENGLISH"
 }
 
-Return ONLY valid JSON, no markdown."""
+Return ONLY valid JSON, ALL TEXT IN ENGLISH."""
     
     def extract_from_file(self, file_path: str, position_id: int) -> Dict[str, Any]:
         """
-        ✅ FIXED: Extract data - Fixed session detachment issue
+        Extract data from resume
         """
         try:
             from database.db import get_db_session
@@ -79,7 +94,6 @@ Return ONLY valid JSON, no markdown."""
             
             logger.info(f"📄 Starting extraction for: {file_path}")
             
-            # ✅ FIX 1: Get all data we need from database FIRST
             position_title = None
             criteria_list = []
             
@@ -89,25 +103,18 @@ Return ONLY valid JSON, no markdown."""
                 if not position:
                     raise ValueError(f"Position {position_id} not found")
                 
-                # ✅ CRITICAL: Extract string values INSIDE the session
-                position_title = str(position.title)  # Convert to string immediately
+                position_title = str(position.title)
                 
-                # Get criteria
                 criteria = db.query(Criterion).filter_by(position_id=position_id).order_by(Criterion.display_order).all()
                 
-                # ✅ CRITICAL: Extract all criterion data INSIDE the session
                 for criterion in criteria:
                     criteria_list.append({
                         'name': str(criterion.criterion_name),
                         'key': str(criterion.criterion_key)
                     })
             
-            # Now session is closed but we have all the data we need
-            
-            # ✅ FIX 2: Build criteria text
             criteria_text = "\n".join([f"- {c['name']} ({c['key']})" for c in criteria_list]) if criteria_list else "No specific criteria"
             
-            # ✅ FIX 3: Build final prompt (outside session)
             final_prompt = f"""Position: {position_title}
 
 Required Information to Extract:
@@ -122,7 +129,6 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             logger.info(f"📏 File exists: {Path(file_path).exists()}")
             logger.info(f"📏 File size: {Path(file_path).stat().st_size if Path(file_path).exists() else 'N/A'}")
             
-            # ✅ FIX 4: Call AI service
             ai_response = ai_service.analyze_resume(file_path, final_prompt)
             
             if not ai_response:
@@ -131,13 +137,10 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             logger.info(f"✅ AI response received ({len(ai_response)} chars)")
             logger.info(f"📄 Response preview: {ai_response[:200]}...")
             
-            # Parse response
             extracted_data = self._parse_ai_response(ai_response)
             
-            # Normalize data
             extracted_data = self._normalize_data(extracted_data)
             
-            # Validate
             self._validate_extracted_data(extracted_data)
             
             logger.info(f"✅ Extraction completed for: {extracted_data.get('full_name', 'Unknown')}")
@@ -151,22 +154,19 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             raise
     
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
-        """✅ FIXED: Better JSON parsing"""
+        """Parse AI response to JSON"""
         try:
             response = response.strip()
             
-            # Remove markdown
             if response.startswith('```json'):
                 response = response.replace('```json', '').replace('```', '').strip()
             elif response.startswith('```'):
                 response = response.replace('```', '').strip()
             
-            # Try to find JSON object
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 response = json_match.group(0)
             
-            # Parse JSON
             data = json.loads(response)
             
             logger.info(f"✅ JSON parsed successfully - Keys: {list(data.keys())}")
@@ -180,12 +180,10 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
     def _normalize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize extracted data"""
         
-        # Normalize phone
         if 'phone' in data and data['phone']:
             normalized_phone = self._normalize_phone(data['phone'])
             data['phone'] = normalized_phone if normalized_phone else data['phone']
         
-        # Convert Persian/Arabic numbers
         persian_to_english = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
         arabic_to_persian = str.maketrans('يك', 'یک')
         
@@ -199,16 +197,13 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
         return data
     
     def _normalize_phone(self, phone: str) -> str:
-        """✅ FIXED: Better phone normalization"""
+        """Normalize phone number"""
         try:
-            # Remove non-digits
             phone = ''.join(filter(str.isdigit, phone))
             
-            # Convert Persian/Arabic
             persian_to_english = str.maketrans('۰۱۲۳۴۵۶۷۸۹', '0123456789')
             phone = phone.translate(persian_to_english)
             
-            # Handle country codes
             if phone.startswith('0098'):
                 phone = '0' + phone[4:]
             elif phone.startswith('98') and len(phone) > 10:
@@ -218,7 +213,6 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             elif not phone.startswith('0'):
                 phone = '0' + phone
             
-            # Validate mobile format
             if phone.startswith('09') and len(phone) == 11:
                 logger.info(f"✅ Valid mobile: {phone}")
                 return phone
@@ -231,18 +225,14 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             return None
     
     def _validate_extracted_data(self, data: Dict[str, Any]) -> None:
-        """
-        ✅ FIXED: Relaxed validation
-        """
+        """Validate extracted data"""
         
-        # Validate full name
         if not data.get('full_name'):
             raise ValueError("Full name is required")
         
         phone = data.get('phone')
         email = data.get('email')
         
-        # Generate temp phone if needed
         if not phone and not email:
             logger.warning("⚠️ No contact info - generating temp phone")
             
@@ -255,7 +245,6 @@ IMPORTANT: Return ONLY the JSON object, no markdown, no explanations."""
             
             logger.info(f"✅ Generated temp phone: {temp_phone}")
         
-        # Validate phone format (warning only)
         if phone and not (phone.startswith('09') and len(phone) == 11):
             logger.warning(f"⚠️ Phone format may be invalid: {phone}")
 
