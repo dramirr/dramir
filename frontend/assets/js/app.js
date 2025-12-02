@@ -1,5 +1,5 @@
 // ===================================
-// COMPLETE app.js with Beautiful Score Range Filter
+// COMPLETE app.js with Translations Support
 // ===================================
 
 let uploadMode = 'single';
@@ -8,13 +8,12 @@ let currentResumes = [];
 let currentCandidates = [];
 let activePollingIntervals = new Map();
 
-// ✅ NEW: Global filter state for Results tab
 let resultsFilters = {
     position_id: '',
     status: 'all',
     score_min: 0,
     score_max: 100,
-    urgency: 50  // 0-100, where higher = lower score threshold (more urgent = accept lower scores)
+    urgency: 50
 };
 
 // ===================================
@@ -29,7 +28,7 @@ function switchTab(tabName) {
     
     if (tabName === 'dashboard') loadDashboard();
     if (tabName === 'results') {
-        loadPositions(); // Ensure positions are loaded for filter
+        loadPositions();
         loadResults();
     }
     if (tabName === 'candidates') loadCandidates();
@@ -37,7 +36,65 @@ function switchTab(tabName) {
 }
 
 // ===================================
-// 2. UPLOAD MODE SWITCH
+// 2. LANGUAGE SWITCHING
+// ===================================
+function updatePageWithLanguage() {
+    const lang = getCurrentLanguage();
+    
+    // به‌روزرسانی Tab Navigation
+    const tabs = document.querySelectorAll('.tab');
+    const tabNames = ['dashboard', 'upload', 'results', 'candidates', 'positions'];
+    const translationKeys = [
+        'nav.dashboard', 'nav.upload', 'nav.results', 
+        'nav.candidates', 'nav.positions'
+    ];
+    
+    tabs.forEach((tab, index) => {
+        if (translationKeys[index]) {
+            tab.textContent = t(translationKeys[index], lang);
+            // اضافه کردن data-i18n برای تطابق
+            tab.setAttribute('data-i18n', translationKeys[index]);
+        }
+    });
+    
+    // به‌روزرسانی Title های Tab Contents
+    updateTabTitles(lang);
+    
+    // به‌روزرسانی دکمه‌های Logout و Status
+    updateHeaderElements(lang);
+}
+
+function updateTabTitles(lang) {
+    const titles = {
+        'dashboard': 'dashboard.title',
+        'upload': 'upload.title',
+        'results': 'results.title',
+        'candidates': 'candidates.title',
+        'positions': 'positions.title'
+    };
+    
+    Object.entries(titles).forEach(([tabId, key]) => {
+        const heading = document.querySelector(`#${tabId} h2`);
+        if (heading) {
+            heading.textContent = t(key, lang);
+        }
+    });
+}
+
+function updateHeaderElements(lang) {
+    const logoutBtn = document.querySelector('#userInfo .btn-secondary');
+    if (logoutBtn) {
+        logoutBtn.textContent = t('header.logout', lang);
+    }
+    
+    const statusText = document.getElementById('statusText');
+    if (statusText && !statusText.hasAttribute('data-i18n')) {
+        statusText.textContent = t('header.disconnected', lang);
+    }
+}
+
+// ===================================
+// 3. UPLOAD MODE SWITCH
 // ===================================
 function setUploadMode(mode) {
     uploadMode = mode;
@@ -57,17 +114,16 @@ function setUploadMode(mode) {
 }
 
 // ===================================
-// 3. LOAD POSITIONS
+// 4. LOAD POSITIONS
 // ===================================
 async function loadPositions() {
     try {
         const data = await api.getPositions();
         currentPositions = data.positions;
         
-        // Update upload position select
         const uploadSelect = document.getElementById('positionSelect');
         if (uploadSelect) {
-            uploadSelect.innerHTML = '<option value="">Select position...</option>';
+            uploadSelect.innerHTML = `<option value="">${t('upload.selectPositionPlaceholder')}</option>`;
             data.positions.forEach(pos => {
                 const option = document.createElement('option');
                 option.value = pos.id;
@@ -76,10 +132,9 @@ async function loadPositions() {
             });
         }
         
-        // ✅ FIXED: Update results filter position select
         const filterSelect = document.getElementById('filterPosition');
         if (filterSelect) {
-            filterSelect.innerHTML = '<option value="">All Positions</option>';
+            filterSelect.innerHTML = `<option value="">${t('results.allPositions')}</option>`;
             data.positions.forEach(pos => {
                 const option = document.createElement('option');
                 option.value = pos.id;
@@ -90,12 +145,12 @@ async function loadPositions() {
         
     } catch (error) {
         console.error('Failed to load positions:', error);
-        showNotification('Failed to load positions', 'error');
+        showNotification(t('notification.failedLoadPositions'), 'error');
     }
 }
 
 // ===================================
-// 4. RESUME STATUS POLLING (FIXED)
+// 5. RESUME STATUS POLLING (FIXED)
 // ===================================
 async function pollResumeStatus(resumeId, onComplete) {
     if (activePollingIntervals.has(resumeId)) {
@@ -131,20 +186,20 @@ async function pollResumeStatus(resumeId, onComplete) {
                 await loadDashboard();
                 
                 if (data.processing_status === 'completed') {
-                    showNotification('✅ Resume processing completed!', 'success');
+                    showNotification(t('notification.processingComplete'), 'success');
                     
                     if (data.score) {
                         displayCompletedResult(resumeId, data);
                     }
                 } else {
-                    showNotification('❌ Resume processing failed', 'error');
+                    showNotification(t('notification.processingFailed'), 'error');
                 }
             }
             
             if (attempts >= maxAttempts) {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
-                showNotification('⏱️ Processing is taking longer than expected', 'warning');
+                showNotification(t('notification.processingLongTime'), 'warning');
             }
             
         } catch (error) {
@@ -153,7 +208,7 @@ async function pollResumeStatus(resumeId, onComplete) {
             if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
                 clearInterval(pollInterval);
                 activePollingIntervals.delete(resumeId);
-                showNotification('⚠️ Authentication error. Please login again.', 'error');
+                showNotification(t('notification.authError'), 'error');
                 
                 if (typeof logout === 'function') {
                     logout();
@@ -176,10 +231,10 @@ function updateStatusDisplay(resumeId, status) {
     if (!statusElement) return;
     
     const statusMessages = {
-        'pending': 'Pending...',
-        'processing': '⏳ Processing...',
-        'completed': '✅ Completed',
-        'failed': '❌ Failed'
+        'pending': t('results.pending'),
+        'processing': t('results.processing'),
+        'completed': t('results.completed'),
+        'failed': t('results.failed')
     };
     
     statusElement.textContent = statusMessages[status] || status;
@@ -201,14 +256,14 @@ function displayCompletedResult(resumeId, data) {
     if (data.score) {
         resultDiv.innerHTML = `
             <div class="result-card">
-                <h4>Processing Complete</h4>
+                <h4>${t('modal.overallScore')}</h4>
                 <div class="score-display">
                     <div class="score-circle ${data.score.status}">
                         ${data.score.percentage.toFixed(1)}%
                     </div>
                     <div class="score-details">
-                        <p><strong>Score:</strong> ${data.score.total_score.toFixed(1)} / ${data.score.max_possible_score.toFixed(1)}</p>
-                        <p><strong>Status:</strong> <span class="${data.score.status}">${data.score.status.toUpperCase()}</span></p>
+                        <p><strong>${t('results.score')}:</strong> ${data.score.total_score.toFixed(1)} / ${data.score.max_possible_score.toFixed(1)}</p>
+                        <p><strong>${t('results.status')}:</strong> <span class="${data.score.status}">${t(`modal.${data.score.status.toLowerCase()}`)}</span></p>
                         ${data.score.overall_assessment ? `<p><strong>Assessment:</strong> ${data.score.overall_assessment}</p>` : ''}
                     </div>
                 </div>
@@ -225,7 +280,7 @@ function cleanupPolling() {
 }
 
 // ===================================
-// 5. UPLOAD RESUME (FIXED)
+// 6. UPLOAD RESUME (FIXED)
 // ===================================
 async function uploadResume() {
     const fileInput = document.getElementById('fileInput');
@@ -234,16 +289,16 @@ async function uploadResume() {
     const resultDiv = document.getElementById('uploadResult');
     
     if (!fileInput.files[0]) {
-        statusDiv.innerHTML = '<div class="alert alert-error">Please select a file</div>';
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile')}</div>`;
         return;
     }
     
     if (!positionId) {
-        statusDiv.innerHTML = '<div class="alert alert-error">Please select a position</div>';
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition')}</div>`;
         return;
     }
     
-    statusDiv.innerHTML = '<div class="alert alert-warning">⏳ Uploading resume...</div>';
+    statusDiv.innerHTML = `<div class="alert alert-warning">${t('upload.uploadingMessage')}</div>`;
     resultDiv.innerHTML = '';
     
     try {
@@ -253,21 +308,21 @@ async function uploadResume() {
             throw new Error(result.message || 'Upload failed');
         }
         
-        statusDiv.innerHTML = '<div class="alert alert-success">✅ Resume uploaded successfully!</div>';
+        statusDiv.innerHTML = `<div class="alert alert-success">${t('upload.successMessage')}</div>`;
         
         const resumeInfo = result.resume;
         const candidateInfo = result.candidate;
         
         resultDiv.innerHTML = `
             <div class="processing-card">
-                <h4>Upload Successful</h4>
+                <h4>${t('upload.successMessage')}</h4>
                 <p><strong>Resume ID:</strong> ${resumeInfo.id}</p>
-                <p><strong>Candidate:</strong> ${candidateInfo.full_name}</p>
+                <p><strong>${t('results.candidate')}:</strong> ${candidateInfo.full_name}</p>
                 <p><strong>File:</strong> ${resumeInfo.filename}</p>
-                <p><strong>Status:</strong> <span id="status-${resumeInfo.id}">${resumeInfo.processing_status}</span></p>
+                <p><strong>${t('results.status')}:</strong> <span id="status-${resumeInfo.id}">${resumeInfo.processing_status}</span></p>
                 <div class="processing-spinner">
                     <div class="spinner"></div>
-                    <p>Processing resume... This may take a moment.</p>
+                    <p>${t('upload.uploadingMessage')}</p>
                 </div>
             </div>
         `;
@@ -285,7 +340,7 @@ async function uploadResume() {
             } else if (finalStatus === 'failed') {
                 resultDiv.innerHTML += `
                     <div class="alert alert-error">
-                        Processing failed. Please check the file and try again.
+                        ${t('notification.processingFailed')}
                     </div>
                 `;
             }
@@ -300,7 +355,7 @@ async function uploadResume() {
 }
 
 // ===================================
-// 6. LOAD DASHBOARD
+// 7. LOAD DASHBOARD
 // ===================================
 async function loadDashboard() {
     try {
@@ -324,30 +379,30 @@ async function loadDashboard() {
             statsContainer.innerHTML = `
                 <div class="stat-card">
                     <div class="stat-value">${stats.total}</div>
-                    <div class="stat-label">📊 Total Resumes</div>
+                    <div class="stat-label">${t('dashboard.totalResumes')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${stats.qualified}</div>
-                    <div class="stat-label">✅ Qualified</div>
+                    <div class="stat-label">${t('dashboard.qualified')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${stats.rejected}</div>
-                    <div class="stat-label">❌ Rejected</div>
+                    <div class="stat-label">${t('dashboard.rejected')}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${avgScore.toFixed(1)}%</div>
-                    <div class="stat-label">📈 Avg Score</div>
+                    <div class="stat-label">${t('dashboard.avgScore')}</div>
                 </div>
             `;
         }
         
         const recentDiv = document.getElementById('recentApplications');
         if (recentDiv) {
-            recentDiv.innerHTML = '<h3>Recent Applications</h3>';
+            recentDiv.innerHTML = `<h3>${t('dashboard.recentApplications')}</h3>`;
             resumes.slice(0, 5).forEach(resume => {
                 recentDiv.innerHTML += `
                     <div class="recent-item">
-                        <strong>${resume.candidate?.full_name || 'Processing...'}</strong>
+                        <strong>${resume.candidate?.full_name || t('upload.uploadingMessage')}</strong>
                         <span class="status-${resume.processing_status}">${resume.processing_status}</span>
                         <small>${new Date(resume.uploaded_at).toLocaleDateString()}</small>
                     </div>
@@ -357,33 +412,29 @@ async function loadDashboard() {
         
     } catch (error) {
         console.error('Failed to load dashboard:', error);
-        showNotification('Failed to load dashboard', 'error');
+        showNotification(t('notification.failedLoadDashboard'), 'error');
     }
 }
 
 // ===================================
-// 7. LOAD RESULTS WITH FILTERS
+// 8. LOAD RESULTS WITH FILTERS
 // ===================================
 async function loadResults() {
     try {
-        // Build filter object
         const filters = {};
         
-        // ✅ FIXED: Get position filter
         const positionSelect = document.getElementById('filterPosition');
         if (positionSelect && positionSelect.value) {
             filters.position_id = positionSelect.value;
             resultsFilters.position_id = positionSelect.value;
         }
         
-        // ✅ FIXED: Get status filter (THIS WAS MISSING!)
         const statusSelect = document.getElementById('filterStatus');
         if (statusSelect && statusSelect.value && statusSelect.value !== 'all') {
             filters.status = statusSelect.value;
             resultsFilters.status = statusSelect.value;
         }
         
-        // ✅ NEW: Add score range filters
         filters.score_min = resultsFilters.score_min;
         filters.score_max = resultsFilters.score_max;
         
@@ -392,9 +443,8 @@ async function loadResults() {
         const data = await api.getResumes(filters);
         let resumes = data.resumes || [];
         
-        // ✅ Filter by score range on frontend (if backend doesn't support it)
         resumes = resumes.filter(resume => {
-            if (!resume.score) return true; // Include processing resumes
+            if (!resume.score) return true;
             return resume.score.percentage >= filters.score_min && 
                    resume.score.percentage <= filters.score_max;
         });
@@ -405,7 +455,7 @@ async function loadResults() {
         if (!tableDiv) return;
         
         if (currentResumes.length === 0) {
-            tableDiv.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-secondary);">No resumes found matching the filters</p>';
+            tableDiv.innerHTML = `<p style="padding: 20px; text-align: center; color: var(--text-secondary);">${t('results.noResumes')}</p>`;
             return;
         }
         
@@ -413,12 +463,12 @@ async function loadResults() {
             <table>
                 <thead>
                     <tr>
-                        <th>Candidate</th>
-                        <th>Position</th>
-                        <th>Score</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Actions</th>
+                        <th>${t('results.candidate')}</th>
+                        <th>${t('results.position')}</th>
+                        <th>${t('results.score')}</th>
+                        <th>${t('results.status')}</th>
+                        <th>${t('results.date')}</th>
+                        <th>${t('results.actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -427,11 +477,11 @@ async function loadResults() {
         currentResumes.forEach(resume => {
             const scoreDisplay = resume.score 
                 ? `<span class="score-badge ${resume.score.status}">${resume.score.percentage.toFixed(1)}%</span>`
-                : '<span class="score-badge pending">Pending</span>';
+                : `<span class="score-badge pending">${t('results.pending')}</span>`;
             
             tableHTML += `
                 <tr>
-                    <td>${resume.candidate?.full_name || 'Processing...'}</td>
+                    <td>${resume.candidate?.full_name || t('upload.uploadingMessage')}</td>
                     <td>${resume.position?.title || 'N/A'}</td>
                     <td>${scoreDisplay}</td>
                     <td>
@@ -441,7 +491,7 @@ async function loadResults() {
                     </td>
                     <td>${new Date(resume.uploaded_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="btn-sm btn-primary" onclick="viewResumeDetails(${resume.id})">View</button>
+                        <button class="btn-sm btn-primary" onclick="viewResumeDetails(${resume.id})">${t('results.view')}</button>
                     </td>
                 </tr>
             `;
@@ -456,12 +506,12 @@ async function loadResults() {
         
     } catch (error) {
         console.error('Failed to load results:', error);
-        showNotification('Failed to load results', 'error');
+        showNotification(t('notification.failedLoadResults'), 'error');
     }
 }
 
 // ===================================
-// 8. ✅ NEW: SCORE RANGE FILTER WITH URGENCY SLIDER
+// 9. SCORE RANGE FILTER WITH URGENCY SLIDER
 // ===================================
 function initializeScoreRangeFilter() {
     const filterContainer = document.getElementById('scoreRangeFilterContainer');
@@ -470,18 +520,18 @@ function initializeScoreRangeFilter() {
     filterContainer.innerHTML = `
         <div class="score-range-filter">
             <div class="filter-header">
-                <h3>🎯 Score Range Filter</h3>
-                <p class="filter-subtitle">Adjust urgency level or set custom score range</p>
+                <h3>${t('results.scoreRangeFilter')}</h3>
+                <p class="filter-subtitle">${t('results.adjustUrgency')}</p>
             </div>
             
             <!-- Urgency Slider Section -->
             <div class="urgency-section">
                 <div class="urgency-header">
-                    <label>⚡ Urgency Level</label>
+                    <label>${t('results.urgencyLevel')}</label>
                     <span class="urgency-value" id="urgencyValue">Medium</span>
                 </div>
                 <div class="urgency-slider-container">
-                    <div class="urgency-label">Low</div>
+                    <div class="urgency-label">${t('results.lowUrgency')}</div>
                     <input 
                         type="range" 
                         id="urgencySlider" 
@@ -491,13 +541,12 @@ function initializeScoreRangeFilter() {
                         class="urgency-slider"
                         oninput="updateUrgencyFilter()"
                     >
-                    <div class="urgency-label">High</div>
+                    <div class="urgency-label">${t('results.highUrgency')}</div>
                 </div>
                 <div class="urgency-description" id="urgencyDescription">
-                    Medium urgency: Accept candidates with 40-100% score
+                    ${t('results.mediumUrgencyDesc')}
                 </div>
                 
-                <!-- Visual indicator of current range -->
                 <div class="score-range-display">
                     <div class="range-bar">
                         <div class="range-fill" id="rangeFill"></div>
@@ -510,21 +559,19 @@ function initializeScoreRangeFilter() {
                 </div>
             </div>
             
-            <!-- OR Divider -->
             <div class="filter-divider">
-                <span>OR</span>
+                <span>${t('results.or')}</span>
             </div>
             
-            <!-- Manual Score Range Section -->
             <div class="manual-range-section">
                 <label class="manual-label">
                     <input type="checkbox" id="manualRangeToggle" onchange="toggleManualRange()">
-                    Set Custom Score Range
+                    ${t('results.customScoreRange')}
                 </label>
                 
                 <div class="manual-inputs" id="manualInputs" style="display: none;">
                     <div class="range-input-group">
-                        <label>Minimum Score</label>
+                        <label>${t('results.minimumScore')}</label>
                         <div class="input-with-unit">
                             <input 
                                 type="range" 
@@ -549,7 +596,7 @@ function initializeScoreRangeFilter() {
                     </div>
                     
                     <div class="range-input-group">
-                        <label>Maximum Score</label>
+                        <label>${t('results.maximumScore')}</label>
                         <div class="input-with-unit">
                             <input 
                                 type="range" 
@@ -575,19 +622,17 @@ function initializeScoreRangeFilter() {
                 </div>
             </div>
             
-            <!-- Action Buttons -->
             <div class="filter-actions">
                 <button class="btn-primary" onclick="applyScoreFilter()">
-                    <span>✓</span> Apply Filter
+                    <span>✓</span> ${t('results.applyFilter')}
                 </button>
                 <button class="btn-secondary" onclick="resetScoreFilter()">
-                    <span>↻</span> Reset
+                    <span>↻</span> ${t('results.resetFilter')}
                 </button>
             </div>
         </div>
     `;
     
-    // Initialize urgency slider
     updateUrgencyFilter();
 }
 
@@ -596,32 +641,26 @@ function updateUrgencyFilter() {
     const urgency = parseInt(slider.value);
     resultsFilters.urgency = urgency;
     
-    // Calculate score range based on urgency
-    // Low urgency (0): Accept 75-100
-    // Medium urgency (50): Accept 40-100
-    // High urgency (100): Accept 0-100
     const minScore = Math.max(0, 75 - (urgency * 0.75));
     const maxScore = 100;
     
     resultsFilters.score_min = Math.round(minScore);
     resultsFilters.score_max = maxScore;
     
-    // Update display
     const urgencyValue = document.getElementById('urgencyValue');
     const urgencyDescription = document.getElementById('urgencyDescription');
     
     if (urgency < 30) {
         urgencyValue.textContent = 'Low (Strict)';
-        urgencyDescription.textContent = '⬆️ Low urgency: Only accept high-quality candidates (75%+)';
+        urgencyDescription.textContent = t('results.lowUrgencyDesc');
     } else if (urgency < 70) {
         urgencyValue.textContent = 'Medium (Balanced)';
-        urgencyDescription.textContent = '⚖️ Medium urgency: Accept candidates with 40%+ score';
+        urgencyDescription.textContent = t('results.mediumUrgencyDesc');
     } else {
         urgencyValue.textContent = 'High (Flexible)';
-        urgencyDescription.textContent = '⬇️ High urgency: Accept all candidates regardless of score';
+        urgencyDescription.textContent = t('results.highUrgencyDesc');
     }
     
-    // Update range display
     document.getElementById('currentMinScore').textContent = Math.round(minScore);
     document.getElementById('currentMaxScore').textContent = maxScore;
     
@@ -631,7 +670,6 @@ function updateUrgencyFilter() {
         rangeFill.style.right = (100 - maxScore) + '%';
     }
     
-    // Disable manual inputs when using urgency
     const manualToggle = document.getElementById('manualRangeToggle');
     if (manualToggle) {
         manualToggle.checked = false;
@@ -646,7 +684,6 @@ function toggleManualRange() {
     manualInputs.style.display = toggle.checked ? 'grid' : 'none';
     
     if (toggle.checked) {
-        // Reset urgency slider
         document.getElementById('urgencySlider').value = 50;
         updateUrgencyFilter();
     }
@@ -661,11 +698,9 @@ function updateManualRange() {
     let minVal = parseInt(minInput.value);
     let maxVal = parseInt(maxInput.value);
     
-    // Sync slider and input
     minSlider.value = minVal;
     maxSlider.value = maxVal;
     
-    // Ensure min < max
     if (minVal > maxVal) {
         minVal = maxVal;
         minInput.value = minVal;
@@ -679,7 +714,7 @@ function updateManualRange() {
 function applyScoreFilter() {
     console.log('Applying score filter:', resultsFilters);
     loadResults();
-    showNotification(`✅ Filter applied: ${resultsFilters.score_min}% - ${resultsFilters.score_max}%`, 'success');
+    showNotification(`${t('results.filterApplied')} ${resultsFilters.score_min}% - ${resultsFilters.score_max}%`, 'success');
 }
 
 function resetScoreFilter() {
@@ -697,11 +732,11 @@ function resetScoreFilter() {
     
     updateUrgencyFilter();
     loadResults();
-    showNotification('✓ Filter reset', 'success');
+    showNotification(t('notification.filterReset'), 'success');
 }
 
 // ===================================
-// 9. ✅ FIXED: FILTER RESULTS (NOW INCLUDES STATUS)
+// 10. FILTER RESULTS
 // ===================================
 async function filterResults() {
     console.log('Filter results called');
@@ -709,7 +744,7 @@ async function filterResults() {
 }
 
 // ===================================
-// 10. VIEW RESUME DETAILS WITH POPUP
+// 11. VIEW RESUME DETAILS WITH POPUP
 // ===================================
 async function viewResumeDetails(resumeId) {
     try {
@@ -728,6 +763,7 @@ async function viewResumeDetails(resumeId) {
 }
 
 function showScorePopup(data) {
+    const lang = getCurrentLanguage();
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = `
@@ -755,27 +791,28 @@ function showScorePopup(data) {
         position: relative;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         animation: slideUp 0.3s;
+        direction: ${lang === 'ar' || lang === 'fa' ? 'rtl' : 'ltr'};
     `;
     
     let content = `
         <button onclick="this.closest('.modal-overlay').remove()" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: var(--text-secondary); line-height: 1;">×</button>
         
-        <h2 style="margin: 0 0 20px 0; color: var(--primary, #3b82f6);">📊 Resume Analysis</h2>
+        <h2 style="margin: 0 0 20px 0; color: var(--primary, #3b82f6);">${t('modal.resumeAnalysis')}</h2>
         
         <div style="background: var(--bg-dark, #0f172a); padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-            <h3 style="margin: 0 0 15px 0;">👤 ${data.candidate?.full_name || 'N/A'}</h3>
+            <h3 style="margin: 0 0 15px 0;">${t('modal.candidate')} ${data.candidate?.full_name || 'N/A'}</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                 <div>
-                    <strong>Position:</strong> ${data.position?.title || 'N/A'}
+                    <strong>${t('modal.position')}</strong> ${data.position?.title || 'N/A'}
                 </div>
                 <div>
-                    <strong>Phone:</strong> ${data.candidate?.phone || 'N/A'}
+                    <strong>${t('modal.phone')}</strong> ${data.candidate?.phone || 'N/A'}
                 </div>
                 <div>
-                    <strong>Email:</strong> ${data.candidate?.email || 'N/A'}
+                    <strong>${t('modal.email')}</strong> ${data.candidate?.email || 'N/A'}
                 </div>
                 <div>
-                    <strong>Upload Date:</strong> ${new Date(data.resume.uploaded_at).toLocaleDateString()}
+                    <strong>${t('modal.uploadDate')}</strong> ${new Date(data.resume.uploaded_at).toLocaleDateString()}
                 </div>
             </div>
         </div>
@@ -787,7 +824,7 @@ function showScorePopup(data) {
         
         content += `
             <div style="background: var(--bg-dark, #0f172a); padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center;">
-                <h3 style="margin: 0 0 20px 0;">📈 Overall Score</h3>
+                <h3 style="margin: 0 0 20px 0;">${t('modal.overallScore')}</h3>
                 <div style="display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap;">
                     <div style="width: 120px; height: 120px; border-radius: 50%; border: 5px solid ${statusColor}; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                         <div style="font-size: 32px; font-weight: bold; color: ${statusColor};">
@@ -798,7 +835,7 @@ function showScorePopup(data) {
                         </div>
                     </div>
                     <div style="text-align: left;">
-                        <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${data.score.status.toUpperCase()}</span></p>
+                        <p style="margin: 5px 0;"><strong>${t('modal.statusText')}</strong> <span style="color: ${statusColor}; font-weight: bold;">${t(`modal.${data.score.status.toLowerCase()}`)}</span></p>
                         <p style="margin: 5px 0; max-width: 400px; line-height: 1.5;">${data.score.overall_assessment || ''}</p>
                     </div>
                 </div>
@@ -809,7 +846,7 @@ function showScorePopup(data) {
     if (data.individual_scores && data.individual_scores.length > 0) {
         content += `
             <div style="background: var(--bg-dark, #0f172a); padding: 25px; border-radius: 12px;">
-                <h3 style="margin: 0 0 20px 0;">🎯 Detailed Scoring</h3>
+                <h3 style="margin: 0 0 20px 0;">${t('modal.detailedScoring')}</h3>
                 <div style="display: grid; gap: 12px;">
         `;
         
@@ -831,7 +868,7 @@ function showScorePopup(data) {
         Object.entries(categories).forEach(([cat, scores]) => {
             if (scores.length === 0) return;
             
-            const categoryName = cat === 'core' ? 'Core Criteria' : cat === 'supplementary' ? 'Supplementary' : 'Other';
+            const categoryName = cat === 'core' ? t('modal.coreCriteria') : cat === 'supplementary' ? t('modal.supplementary') : 'Other';
             
             content += `<h4 style="margin: 20px 0 10px 0; color: var(--text-secondary);">${categoryName}</h4>`;
             
@@ -851,7 +888,7 @@ function showScorePopup(data) {
                         <div style="background: var(--bg-dark, #0f172a); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
                             <div style="width: ${percentage}%; height: 100%; background: ${barColor}; transition: width 0.3s;"></div>
                         </div>
-                        ${score.extracted_value ? `<p style="margin: 5px 0; font-size: 13px;"><strong>Extracted Value:</strong> ${score.extracted_value}</p>` : ''}
+                        ${score.extracted_value ? `<p style="margin: 5px 0; font-size: 13px;"><strong>${t('modal.extractedValue')}</strong> ${score.extracted_value}</p>` : ''}
                         ${score.reasoning ? `<p style="margin: 5px 0; font-size: 13px; color: var(--text-secondary);">${score.reasoning}</p>` : ''}
                     </div>
                 `;
@@ -889,7 +926,7 @@ function showScorePopup(data) {
 }
 
 // ===================================
-// 11. LOAD CANDIDATES
+// 12. LOAD CANDIDATES
 // ===================================
 async function loadCandidates() {
     try {
@@ -902,7 +939,7 @@ async function loadCandidates() {
         candidatesList.innerHTML = '';
         
         if (currentCandidates.length === 0) {
-            candidatesList.innerHTML = '<p>No candidates found</p>';
+            candidatesList.innerHTML = `<p>${t('candidates.noCandidates')}</p>`;
             return;
         }
         
@@ -914,19 +951,19 @@ async function loadCandidates() {
                 <p>📞 ${candidate.phone || 'N/A'}</p>
                 <p>📧 ${candidate.email || 'N/A'}</p>
                 <p>📊 ${candidate.total_submissions} submission(s)</p>
-                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">View Details</button>
+                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">${t('candidates.viewDetails')}</button>
             `;
             candidatesList.appendChild(card);
         });
         
     } catch (error) {
         console.error('Failed to load candidates:', error);
-        showNotification('Failed to load candidates', 'error');
+        showNotification(t('notification.failedLoadCandidates'), 'error');
     }
 }
 
 // ===================================
-// 12. LOAD POSITIONS LIST
+// 13. LOAD POSITIONS LIST
 // ===================================
 async function loadPositionsList() {
     try {
@@ -939,7 +976,7 @@ async function loadPositionsList() {
         positionsList.innerHTML = '';
         
         if (currentPositions.length === 0) {
-            positionsList.innerHTML = '<p>No positions found</p>';
+            positionsList.innerHTML = `<p>${t('positions.noPositions')}</p>`;
             return;
         }
         
@@ -958,7 +995,7 @@ async function loadPositionsList() {
         
     } catch (error) {
         console.error('Failed to load positions:', error);
-        showNotification('Failed to load positions', 'error');
+        showNotification(t('notification.failedLoadPositions'), 'error');
     }
 }
 
@@ -1018,7 +1055,7 @@ async function searchCandidates() {
         candidatesList.innerHTML = '';
         
         if (currentCandidates.length === 0) {
-            candidatesList.innerHTML = '<p>No candidates found</p>';
+            candidatesList.innerHTML = `<p>${t('candidates.noCandidates')}</p>`;
             return;
         }
         
@@ -1030,7 +1067,7 @@ async function searchCandidates() {
                 <p>📞 ${candidate.phone || 'N/A'}</p>
                 <p>📧 ${candidate.email || 'N/A'}</p>
                 <p>📊 ${candidate.total_submissions} submission(s)</p>
-                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">View Details</button>
+                <button class="btn-sm btn-primary" onclick="viewCandidateDetails(${candidate.id})">${t('candidates.viewDetails')}</button>
             `;
             candidatesList.appendChild(card);
         });
@@ -1086,7 +1123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
-            const fileName = e.target.files[0]?.name || 'No file selected';
+            const fileName = e.target.files[0]?.name || t('upload.noFileSelected');
             const fileNameDisplay = document.getElementById('fileName');
             if (fileNameDisplay) {
                 fileNameDisplay.textContent = fileName;
@@ -1100,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const count = e.target.files.length;
             const fileCountDisplay = document.getElementById('fileCount');
             if (fileCountDisplay) {
-                fileCountDisplay.textContent = `${count} file(s) selected`;
+                fileCountDisplay.textContent = `${count} ${t('upload.filesSelected')}`;
             }
         });
     }
@@ -1108,6 +1145,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.addEventListener('beforeunload', () => {
         cleanupPolling();
     });
+    
+    // بروزرسانی صفحه با ترجمه‌های دینامی
+    updatePageWithLanguage();
 });
 
 // ===================================
@@ -1134,3 +1174,4 @@ window.toggleManualRange = toggleManualRange;
 window.updateManualRange = updateManualRange;
 window.applyScoreFilter = applyScoreFilter;
 window.resetScoreFilter = resetScoreFilter;
+window.updatePageWithLanguage = updatePageWithLanguage;

@@ -7,6 +7,83 @@
     <link rel="stylesheet" href="/assets/css/styles.css">
     <style>
         /* ===================================
+           LANGUAGE SELECTOR STYLES
+           =================================== */
+        
+        .language-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .language-label {
+            color: var(--text-secondary, #94a3b8);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 0;
+        }
+        
+        .language-buttons {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .lang-btn {
+            padding: 6px 12px;
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .lang-btn:hover {
+            border-color: var(--primary);
+            background: var(--bg-medium);
+        }
+        
+        .lang-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* RTL Support */
+        html[dir="rtl"] {
+            direction: rtl;
+            text-align: right;
+        }
+        
+        html[dir="rtl"] .header {
+            flex-direction: row-reverse;
+        }
+        
+        html[dir="rtl"] .header-right {
+            flex-direction: row-reverse;
+        }
+        
+        html[dir="rtl"] .logo-container {
+            flex-direction: row-reverse;
+        }
+        
+        html[dir="rtl"] .btn-group {
+            flex-direction: row-reverse;
+        }
+        
+        html[dir="rtl"] table {
+            text-align: right;
+        }
+        
+        html[dir="rtl"] th, html[dir="rtl"] td {
+            text-align: right;
+        }
+        
+        /* ===================================
            SCORE RANGE FILTER STYLES
            =================================== */
         
@@ -477,19 +554,27 @@
                 <div class="logo-container">
                     <div class="logo" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">T</div>
                     <div class="header-title">
-                        <h1>TalentRadar</h1>
-                        <p class="subtitle">AI-Powered Applicant Tracking System</p>
+                        <h1 data-i18n="header.title">TalentRadar</h1>
+                        <p class="subtitle" data-i18n="header.subtitle">AI-Powered Applicant Tracking System</p>
                     </div>
                 </div>
             </div>
             <div class="header-right">
+                <div class="language-selector">
+                    <span class="language-label" data-i18n="header.language">Language</span>
+                    <div class="language-buttons">
+                        <button class="lang-btn active" onclick="switchLanguage('en')">🇬🇧 EN</button>
+                        <button class="lang-btn" onclick="switchLanguage('ar')">🇸🇦 AR</button>
+                        <button class="lang-btn" onclick="switchLanguage('fa')">🇮🇷 FA</button>
+                    </div>
+                </div>
                 <div class="user-info" id="userInfo" style="display:none;">
                     <span id="userName">User</span>
                     <button class="btn-secondary btn-sm" onclick="logout()">Logout</button>
                 </div>
                 <div class="api-status">
                     <div class="status-dot" id="statusDot"></div>
-                    <span id="statusText">Disconnected</span>
+                    <span id="statusText" data-i18n="header.disconnected">Disconnected</span>
                 </div>
             </div>
         </header>
@@ -497,22 +582,20 @@
         <!-- Login Section -->
         <div id="loginSection" class="login-section" style="display: flex;">
             <div class="login-card">
-                <h2>Login to TalentRadar</h2>
+                <h2 data-i18n="login.title">Login to TalentRadar</h2>
                 <form id="loginForm" onsubmit="handleLogin(event)">
                     <div class="form-group">
-                        <label>Username</label>
+                        <label data-i18n="login.username">Username</label>
                         <input type="text" id="loginUsername" class="form-control" value="admin" required>
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
+                        <label data-i18n="login.password">Password</label>
                         <input type="password" id="loginPassword" class="form-control" value="admin123" required>
                     </div>
-                    <button type="submit" class="btn-primary btn-block">Login</button>
+                    <button type="submit" class="btn-primary btn-block" data-i18n="login.loginButton">Login</button>
                 </form>
                 <div id="loginError" class="alert alert-error" style="display:none; margin-top:15px;"></div>
-                <p style="margin-top: 20px; text-align: center; color: var(--text-secondary, #94a3b8); font-size: 13px;">
-                    Default credentials: admin / admin123
-                </p>
+                <p style="margin-top: 20px; text-align: center; color: var(--text-secondary, #94a3b8); font-size: 13px;" data-i18n="login.defaultCredentials">Default credentials: admin / admin123</p>
             </div>
         </div>
 
@@ -520,32 +603,32 @@
         <div id="mainApp" style="display:none;">
             <!-- Navigation Tabs -->
             <nav class="tabs">
-                <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
-                <div class="tab" onclick="switchTab('upload')">📤 Upload Resume</div>
-                <div class="tab" onclick="switchTab('results')">📋 Results</div>
-                <div class="tab" onclick="switchTab('candidates')">👥 Candidates</div>
-                <div class="tab" onclick="switchTab('positions')">💼 Positions</div>
+                <div class="tab active" onclick="switchTab('dashboard')" data-i18n="nav.dashboard">📊 Dashboard</div>
+                <div class="tab" onclick="switchTab('upload')" data-i18n="nav.upload">📤 Upload Resume</div>
+                <div class="tab" onclick="switchTab('results')" data-i18n="nav.results">📋 Results</div>
+                <div class="tab" onclick="switchTab('candidates')" data-i18n="nav.candidates">👥 Candidates</div>
+                <div class="tab" onclick="switchTab('positions')" data-i18n="nav.positions">💼 Positions</div>
             </nav>
 
             <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content active">
-                <h2>Dashboard</h2>
+                <h2 data-i18n="dashboard.title">Dashboard</h2>
                 <div class="stats-grid" id="statsContainer">
                     <div class="stat-card">
                         <div class="stat-value">0</div>
-                        <div class="stat-label">📊 Total Resumes</div>
+                        <div class="stat-label" data-i18n="dashboard.totalResumes">📊 Total Resumes</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">0</div>
-                        <div class="stat-label">✅ Qualified</div>
+                        <div class="stat-label" data-i18n="dashboard.qualified">✅ Qualified</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">0</div>
-                        <div class="stat-label">❌ Rejected</div>
+                        <div class="stat-label" data-i18n="dashboard.rejected">❌ Rejected</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value">0%</div>
-                        <div class="stat-label">📈 Avg Score</div>
+                        <div class="stat-label" data-i18n="dashboard.avgScore">📈 Avg Score</div>
                     </div>
                 </div>
 
@@ -554,46 +637,42 @@
 
             <!-- Upload Tab -->
             <div id="upload" class="tab-content">
-                <h2>Upload Resume</h2>
+                <h2 data-i18n="upload.title">Upload Resume</h2>
                 
                 <div class="card">
                     <div class="form-group">
-                        <label>Select Position</label>
+                        <label data-i18n="upload.selectPosition">Select Position</label>
                         <select id="positionSelect" class="form-control">
-                            <option value="">Loading positions...</option>
+                            <option value="" data-i18n="upload.selectPositionPlaceholder">Loading positions...</option>
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label>Upload Mode</label>
+                        <label data-i18n="upload.uploadMode">Upload Mode</label>
                         <div class="btn-group">
-                            <button class="btn-secondary active" onclick="setUploadMode('single')">Single Resume</button>
-                            <button class="btn-secondary" onclick="setUploadMode('bulk')">Bulk Upload</button>
+                            <button class="btn-secondary active" onclick="setUploadMode('single')" data-i18n="upload.singleResume">Single Resume</button>
+                            <button class="btn-secondary" onclick="setUploadMode('bulk')" data-i18n="upload.bulkUpload">Bulk Upload</button>
                         </div>
                     </div>
 
                     <!-- Single Upload -->
                     <div id="singleUpload">
                         <div class="form-group">
-                            <label>Select Resume File</label>
+                            <label data-i18n="upload.selectFile">Select Resume File</label>
                             <input type="file" id="fileInput" class="form-control" accept=".pdf,.docx,.doc,.jpg,.jpeg,.png">
-                            <small id="fileName" style="display: block; margin-top: 5px; color: var(--text-secondary);">No file selected</small>
+                            <small id="fileName" style="display: block; margin-top: 5px; color: var(--text-secondary);" data-i18n="upload.noFileSelected">No file selected</small>
                         </div>
-                        <button class="btn-primary" onclick="uploadResume()">
-                            <span class="btn-icon">📤</span> Upload & Analyze
-                        </button>
+                        <button class="btn-primary" onclick="uploadResume()" data-i18n="upload.uploadButton">📤 Upload & Analyze</button>
                     </div>
 
                     <!-- Bulk Upload -->
                     <div id="bulkUpload" style="display:none;">
                         <div class="form-group">
-                            <label>Select Multiple Resumes</label>
+                            <label data-i18n="upload.selectMultiple">Select Multiple Resumes</label>
                             <input type="file" id="filesInput" class="form-control" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png">
-                            <small id="fileCount" style="display: block; margin-top: 5px; color: var(--text-secondary);">0 file(s) selected</small>
+                            <small id="fileCount" style="display: block; margin-top: 5px; color: var(--text-secondary);" data-i18n="upload.noFileSelected">0 file(s) selected</small>
                         </div>
-                        <button class="btn-primary" onclick="bulkUploadResumes()">
-                            <span class="btn-icon">📤</span> Upload All
-                        </button>
+                        <button class="btn-primary" onclick="bulkUploadResumes()" data-i18n="upload.uploadAllButton">📤 Upload All</button>
                     </div>
                 </div>
 
@@ -603,21 +682,21 @@
 
             <!-- Results Tab -->
             <div id="results" class="tab-content">
-                <h2>All Results</h2>
+                <h2 data-i18n="results.title">All Results</h2>
                 
                 <!-- ✅ FIXED & IMPROVED: Results Filters -->
                 <div class="filters">
                     <select id="filterPosition" class="form-control" onchange="filterResults()">
-                        <option value="">All Positions</option>
+                        <option value="" data-i18n="results.allPositions">All Positions</option>
                     </select>
                     
                     <!-- ✅ FIXED: Status Filter Now Works -->
                     <select id="filterStatus" class="form-control" onchange="filterResults()">
-                        <option value="all">All Status</option>
-                        <option value="completed">✅ Completed</option>
-                        <option value="processing">⏳ Processing</option>
-                        <option value="pending">⏳ Pending</option>
-                        <option value="failed">❌ Failed</option>
+                        <option value="all" data-i18n="results.allStatus">All Status</option>
+                        <option value="completed" data-i18n="results.completed">✅ Completed</option>
+                        <option value="processing" data-i18n="results.processing">⏳ Processing</option>
+                        <option value="pending" data-i18n="results.pending">⏳ Pending</option>
+                        <option value="failed" data-i18n="results.failed">❌ Failed</option>
                     </select>
                 </div>
                 
@@ -630,10 +709,10 @@
 
             <!-- Candidates Tab -->
             <div id="candidates" class="tab-content">
-                <h2>Candidates</h2>
+                <h2 data-i18n="candidates.title">Candidates</h2>
                 
                 <div class="filters">
-                    <input type="text" id="searchCandidate" class="form-control" placeholder="Search by name or phone..." onkeyup="searchCandidates()">
+                    <input type="text" id="searchCandidate" class="form-control" placeholder="Search by name or phone..." onkeyup="searchCandidates()" data-i18n="candidates.search">
                 </div>
 
                 <div id="candidatesList" class="candidates-list"></div>
@@ -641,11 +720,9 @@
 
             <!-- Positions Tab -->
             <div id="positions" class="tab-content">
-                <h2>Positions</h2>
+                <h2 data-i18n="positions.title">Positions</h2>
                 
-                <button class="btn-primary" onclick="alert('Create position feature coming soon!')">
-                    <span class="btn-icon">➕</span> Create Position
-                </button>
+                <button class="btn-primary" onclick="alert('Create position feature coming soon!')" data-i18n="positions.createPosition">➕ Create Position</button>
 
                 <div id="positionsList" class="positions-list"></div>
             </div>
@@ -653,13 +730,32 @@
     </div>
 
     <!-- Load scripts in correct order -->
-    <!-- 1. API service first -->
+    <!-- 1. Translations first -->
+    <script src="/assets/js/translations.js"></script>
+    
+    <!-- 2. API service -->
     <script src="/assets/js/api.js"></script>
     
-    <!-- 2. Auth logic (handles login/logout and initial auth check) -->
+    <!-- 3. Auth logic -->
     <script src="/assets/js/auth.js"></script>
     
-    <!-- 3. Main app logic (handles UI and features) -->
+    <!-- 4. Language switcher function -->
+    <script>
+        function switchLanguage(lang) {
+            setLanguage(lang);
+            
+            // Update active button
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update page content
+            updatePageLanguage();
+        }
+    </script>
+    
+    <!-- 5. Main app logic -->
     <script src="/assets/js/app.js"></script>
     
     <!-- ✅ NEW: Initialize Score Range Filter after page load -->
