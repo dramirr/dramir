@@ -1,6 +1,6 @@
 {
   "app": "drfiller",
-  "port": 3000,
+  "port": 5000,
   "build": {
     "location": "germany"
   },
