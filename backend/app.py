@@ -1,6 +1,6 @@
 """
 Main Flask Application - TalentRadar v2
-FIXED VERSION: Proper static file serving + Flask 2.3+ compatibility
+FIXED VERSION: Proper CORS for Liara deployment
 """
 from flask import Flask, send_from_directory, jsonify
 from flask_jwt_extended import JWTManager
@@ -33,11 +33,18 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=30)
 
 # Initialize extensions
 jwt = JWTManager(app)
+
+# ✅ CRITICAL: CORS Configuration for Liara
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:*", "http://127.0.0.1:*"],
+        "origins": [
+            "https://drfiller.liara.run",  # ✅ اضافه شدن دامنه Liara
+            "http://localhost:*",
+            "http://127.0.0.1:*"
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
     }
 })
 
@@ -63,7 +70,7 @@ init_database(config)
 create_default_admin()
 seed_database()
 
-logger.info("Database initialized successfully")
+logger.info("✅ Database initialized successfully")
 
 # ===================================
 # STATIC FILE SERVING ROUTES
@@ -86,9 +93,7 @@ def serve_assets(path):
     except Exception as e:
         logger.error(f"Error serving asset {path}: {e}")
         return jsonify({'error': 'Asset not found'}), 404
-# ... existing imports ...
 
-# Add this route before the catch-all route
 @app.route('/uploads/<path:filename>')
 def serve_upload(filename):
     """Serve uploaded files for AI processing"""
@@ -101,20 +106,14 @@ def serve_upload(filename):
     
 @app.route('/<path:path>')
 def serve_static(path):
-    """
-    Catch-all route for any other static files
-    This prevents 404 errors for direct file access
-    """
+    """Catch-all route for any other static files"""
     try:
-        # Don't serve API routes through static handler
         if path.startswith('api/'):
             return jsonify({'error': 'API endpoint not found'}), 404
         
-        # Try to serve from frontend directory
         return send_from_directory('../frontend', path)
     except Exception as e:
         logger.error(f"Error serving {path}: {e}")
-        # If file not found, serve index.html for client-side routing
         try:
             return send_from_directory('../frontend', 'index.html')
         except:
@@ -129,11 +128,9 @@ def not_found(error):
     """Handle 404 errors"""
     logger.warning(f"404 error: {error}")
     
-    # For API calls, return JSON
     if '/api/' in str(error):
         return jsonify({'success': False, 'message': 'API endpoint not found'}), 404
     
-    # For other requests, serve index.html (SPA fallback)
     try:
         return send_from_directory('../frontend', 'index.html')
     except:
@@ -166,11 +163,11 @@ def health_check():
     })
 
 # ===================================
-# STARTUP MESSAGE (Fixed for Flask 2.3+)
+# STARTUP MESSAGE
 # ===================================
 
 def display_startup_message():
-    """Display startup message - called once at initialization"""
+    """Display startup message"""
     logger.info("=" * 80)
     logger.info("🚀 TalentRadar ATS Started Successfully!")
     logger.info("=" * 80)
@@ -182,7 +179,6 @@ def display_startup_message():
     logger.info("⚠️  IMPORTANT: Change default password in production!")
     logger.info("=" * 80)
 
-# Call startup message after initialization
 display_startup_message()
 
 # ===================================
@@ -198,5 +194,5 @@ if __name__ == '__main__':
         host=config.HOST,
         port=config.PORT,
         debug=config.DEBUG,
-        threaded=True  # Enable threading for concurrent requests
+        threaded=True
     )

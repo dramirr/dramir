@@ -36,7 +36,7 @@ data/*.sqlite
 logs/
 *.log
 
-# Environment files
+# Environment files (except .env for production)
 .env.local
 .env.*.local
 

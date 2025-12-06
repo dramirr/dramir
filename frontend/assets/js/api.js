@@ -1,4 +1,9 @@
-const API_URL = 'http://localhost:5000/api';
+// ✅ CRITICAL: Auto-detect API URL based on environment
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : `${window.location.origin}/api`;
+
+console.log('🔗 API URL:', API_URL);
 
 function getAuthHeader() {
     const token = localStorage.getItem('access_token');
@@ -134,17 +139,14 @@ const api = {
         let url = `${API_URL}/resumes`;
         const params = new URLSearchParams();
         
-        // ✅ FIXED: Properly add filters to query params
         if (filters.position_id) {
             params.append('position_id', filters.position_id);
         }
         
-        // ✅ FIXED: Add status filter (this was missing!)
         if (filters.status) {
             params.append('status', filters.status);
         }
         
-        // ✅ NEW: Score range filters (note: backend may not support yet, but frontend sends it)
         if (filters.score_min !== undefined) {
             params.append('score_min', filters.score_min);
         }
