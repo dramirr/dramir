@@ -1,6 +1,7 @@
 """
 Resumes API Endpoints - FIXED FOR LLM-BASED SCORING
 ✅ Fixed: Uses LLM for scoring instead of rule-based calculation
+✅ Fixed: f-string syntax error
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -242,10 +243,18 @@ def upload_resume():
                 os.remove(filepath)
                 return jsonify({'success': False, 'message': 'Position not found'}), 404
             
-            temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}".encode()).hexdigest()[:15]}"
+            # ✅ FIXED: Create hash string first, then use in f-string
+            timestamp_str = datetime.utcnow().isoformat()
+            hash_input = f"{filename}{timestamp_str}"
+            hash_value = hashlib.md5(hash_input.encode()).hexdigest()[:15]
+            temp_phone = f"temp_{hash_value}"
             
+            # Check for duplicates
             while db.query(Candidate).filter_by(phone=temp_phone).first():
-                temp_phone = f"temp_{hashlib.md5(f"{filename}{datetime.utcnow().isoformat()}{os.urandom(8)}".encode()).hexdigest()[:15]}"
+                random_bytes = os.urandom(8).hex()
+                hash_input_new = f"{filename}{timestamp_str}{random_bytes}"
+                hash_value_new = hashlib.md5(hash_input_new.encode()).hexdigest()[:15]
+                temp_phone = f"temp_{hash_value_new}"
             
             candidate = Candidate(
                 phone=temp_phone,

@@ -1,14 +1,20 @@
-# Python
-venv/
+# Python cache
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.pyc
 *.pyo
 *.pyd
-.Python
+
+# Virtual environments
+venv/
 env/
 .venv
+ENV/
 
-# IDE
+# IDE files
 .vscode/
 .idea/
 *.swp
@@ -16,38 +22,60 @@ env/
 *~
 .DS_Store
 
-# Git
+# Git files
 .git/
 .gitignore
 .gitattributes
 
-# Data و Logs
+# Database files (will be created in container)
 data/talentdatar.db
+data/*.db
+data/*.sqlite
+
+# Logs
 logs/
 *.log
 
-# Environment
-.env
+# Environment files
 .env.local
 .env.*.local
 
-# Test و Coverage
+# Test files
 .pytest_cache/
 .coverage
 htmlcov/
+.tox/
+.hypothesis/
 
-# Windows
+# OS files
 Thumbs.db
 *.lnk
-
-# macOS
 .AppleDouble
 .AppleDB
 ._*
+desktop.ini
 
-# Project specific
-uploads/
-backups/
-temp/
-*.zip
-*.tar.gz
+# Uploads (will be created in container)
+data/uploads/*
+data/backups/*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Jupyter
+.ipynb_checkpoints
+
+# Node (if any)
+node_modules/
+package-lock.json
