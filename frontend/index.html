@@ -450,99 +450,157 @@
             flex: 1;
         }
         
-        .bulk-result-item {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 6px;
-        }
+        /* ===================================
+           BULK UPLOAD RESULT CARD STYLING
+           =================================== */
         
-        .bulk-result-item.success {
-            background: rgba(16, 185, 129, 0.1);
-            border-left: 3px solid var(--success, #10b981);
+        .bulk-result-card {
+            border-left: 4px solid #666;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 15px;
+            background: var(--bg-light);
+            transition: all 0.3s ease;
+            animation: slideInUp 0.4s ease-out;
         }
-        
-        .bulk-result-item.error {
-            background: rgba(239, 68, 68, 0.1);
-            border-left: 3px solid var(--error, #ef4444);
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
-        
-        .recent-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
+
+        .bulk-result-card:hover {
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .bulk-result-card strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .bulk-result-card p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin: 5px 0;
+        }
+
+        /* Processing Card */
+        .processing-card {
             background: var(--bg-light, #334155);
-            border-radius: 6px;
-            margin-bottom: 10px;
-        }
-        
-        .candidate-card, .position-card {
-            background: var(--bg-medium, #1e293b);
             padding: 20px;
             border-radius: 12px;
+            margin-top: 20px;
             border: 1px solid var(--border, #475569);
-            margin-bottom: 15px;
+        }
+
+        .processing-card h4 {
+            margin: 0 0 15px 0;
+            color: var(--primary, #3b82f6);
+            font-size: 18px;
+        }
+
+        .processing-card h5 {
+            margin: 20px 0 10px 0;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        /* Processing Spinner */
+        .processing-spinner {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .processing-spinner p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin: 10px 0 0 0;
+        }
+
+        /* Results Container */
+        #bulkResultsContainer {
+            background: var(--bg-dark);
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 900px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        /* Scrollbar styling for results container */
+        #bulkResultsContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #bulkResultsContainer::-webkit-scrollbar-track {
+            background: var(--bg-medium);
+            border-radius: 4px;
+        }
+
+        #bulkResultsContainer::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        #bulkResultsContainer::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
         }
         
-        .candidate-card h3, .position-card h3 {
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
-        
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 13px;
-        }
-        
-        .score-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        
-        .score-badge.Qualified {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--success, #10b981);
-        }
-        
-        .score-badge.Rejected {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--error, #ef4444);
-        }
-        
-        .score-badge.pending {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--warning, #f59e0b);
-        }
-        
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        
-        .status-badge.status-pending {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--warning, #f59e0b);
-        }
-        
-        .status-badge.status-processing {
-            background: rgba(23, 162, 184, 0.2);
-            color: #17a2b8;
-        }
-        
-        .status-badge.status-completed {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--success, #10b981);
-        }
-        
-        .status-badge.status-failed {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--error, #ef4444);
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .tabs {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters {
+                flex-direction: column;
+            }
+            
+            .filters .form-control {
+                width: 100%;
+            }
+            
+            .manual-inputs {
+                grid-template-columns: 1fr !important;
+            }
+
+            .score-display {
+                flex-direction: column;
+            }
+
+            .score-circle {
+                width: 60px;
+                height: 60px;
+                font-size: 14px;
+            }
+
+            #bulkResultsContainer {
+                max-height: 600px;
+            }
+
+            .bulk-result-card {
+                padding: 12px;
+            }
+
+            .bulk-result-card strong {
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -665,7 +723,7 @@
                         <button class="btn-primary" onclick="uploadResume()" data-i18n="upload.uploadButton">📤 Upload & Analyze</button>
                     </div>
 
-                    <!-- Bulk Upload - ✅ FIXED: Correct ID "filesInput" -->
+                    <!-- Bulk Upload -->
                     <div id="bulkUpload" style="display:none;">
                         <div class="form-group">
                             <label data-i18n="upload.selectMultiple">Select Multiple Resumes</label>
@@ -750,7 +808,7 @@
             event.target.classList.add('active');
             
             // Update page content
-            updatePageLanguage();
+            updatePageWithLanguage();
         }
     </script>
     

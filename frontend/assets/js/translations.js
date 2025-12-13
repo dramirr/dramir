@@ -43,9 +43,15 @@ const translations = {
         'upload.uploadAllButton': '📤 Upload All',
         'upload.noFile': 'Please select a file',
         'upload.noPosition': 'Please select a position',
-        'upload.uploadingMessage': '⏳ Uploading resume...',
-        'upload.successMessage': '✅ Resume uploaded successfully!',
-        'upload.errorMessage': '❌',
+        'upload.uploadingMessage': '⏳ Uploading resumes',
+        'upload.successMessage': '✅ Resume(s) uploaded successfully!',
+        'upload.errorMessage': '❌ Error',
+        'upload.totalFilesLabel': 'Total Files',
+        'upload.successLabel': 'Successful',
+        'upload.failedLabel': 'Failed',
+        'upload.uploadedResumesLabel': 'Uploaded Resumes',
+        'upload.processingMessage': '⏳ Processing resumes... This may take a few minutes',
+        'upload.waitingForResults': 'Waiting for results...',
 
         // Results
         'results.title': 'All Results',
@@ -125,6 +131,7 @@ const translations = {
         'notification.processingLongTime': '⏱️ Processing is taking longer than expected',
         'notification.authError': '⚠️ Authentication error. Please login again.',
         'notification.filterReset': '✓ Filter reset',
+        'notification.uploadInProgress': '⏳ Upload already in progress',
     },
 
     ar: {
@@ -166,9 +173,15 @@ const translations = {
         'upload.uploadAllButton': '📤 تحميل الكل',
         'upload.noFile': 'يرجى اختيار ملف',
         'upload.noPosition': 'يرجى اختيار وظيفة',
-        'upload.uploadingMessage': '⏳ جاري تحميل السيرة الذاتية...',
+        'upload.uploadingMessage': '⏳ جاري تحميل السيرة الذاتية',
         'upload.successMessage': '✅ تم تحميل السيرة الذاتية بنجاح!',
-        'upload.errorMessage': '❌',
+        'upload.errorMessage': '❌ خطأ',
+        'upload.totalFilesLabel': 'إجمالي الملفات',
+        'upload.successLabel': 'ناجح',
+        'upload.failedLabel': 'فشل',
+        'upload.uploadedResumesLabel': 'السيرة الذاتية المحملة',
+        'upload.processingMessage': '⏳ جاري معالجة السيرة الذاتية... قد يستغرق هذا بعض الوقت',
+        'upload.waitingForResults': 'في انتظار النتائج...',
 
         // Results
         'results.title': 'جميع النتائج',
@@ -248,6 +261,7 @@ const translations = {
         'notification.processingLongTime': '⏱️ المعالجة تستغرق وقتاً أطول من المتوقع',
         'notification.authError': '⚠️ خطأ في المصادقة. يرجى تسجيل الدخول مرة أخرى.',
         'notification.filterReset': '✓ تم إعادة تعيين المرشح',
+        'notification.uploadInProgress': '⏳ التحميل جاري بالفعل',
     },
 
     fa: {
@@ -289,9 +303,15 @@ const translations = {
         'upload.uploadAllButton': '📤 بارگذاری همه',
         'upload.noFile': 'لطفا یک فایل انتخاب کنید',
         'upload.noPosition': 'لطفا یک موقعیت انتخاب کنید',
-        'upload.uploadingMessage': '⏳ در حال بارگذاری رزومه...',
+        'upload.uploadingMessage': '⏳ در حال بارگذاری رزومه',
         'upload.successMessage': '✅ رزومه با موفقیت بارگذاری شد!',
-        'upload.errorMessage': '❌',
+        'upload.errorMessage': '❌ خطا',
+        'upload.totalFilesLabel': 'کل فایل‌ها',
+        'upload.successLabel': 'موفق',
+        'upload.failedLabel': 'ناموفق',
+        'upload.uploadedResumesLabel': 'رزومه‌های بارگذاری شده',
+        'upload.processingMessage': '⏳ در حال پردازش رزومه‌ها... این ممکن است چند دقیقه طول بکشد',
+        'upload.waitingForResults': 'در انتظار نتایج...',
 
         // Results
         'results.title': 'تمام نتایج',
@@ -371,6 +391,7 @@ const translations = {
         'notification.processingLongTime': '⏱️ پردازش بیشتر از حد انتظار طول کشید',
         'notification.authError': '⚠️ خطای تایید. لطفا دوباره وارد شوید.',
         'notification.filterReset': '✓ فیلتر بازنشانی شد',
+        'notification.uploadInProgress': '⏳ بارگذاری در حال انجام است',
     }
 };
 

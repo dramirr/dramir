@@ -1,5 +1,5 @@
 // ===================================
-// COMPLETE app.js with Translations Support & FIXED Bulk Upload
+// COMPLETE app.js with All Fixes
 // ===================================
 
 let uploadMode = 'single';
@@ -7,7 +7,7 @@ let currentPositions = [];
 let currentResumes = [];
 let currentCandidates = [];
 let activePollingIntervals = new Map();
-let bulkUploadInProgress = false; // ✅ CRITICAL: Track bulk upload state
+let bulkUploadInProgress = false;
 
 let resultsFilters = {
     position_id: '',
@@ -42,7 +42,6 @@ function switchTab(tabName) {
 function updatePageWithLanguage() {
     const lang = getCurrentLanguage();
     
-    // به‌روزرسانی Tab Navigation
     const tabs = document.querySelectorAll('.tab');
     const tabNames = ['dashboard', 'upload', 'results', 'candidates', 'positions'];
     const translationKeys = [
@@ -147,7 +146,7 @@ async function loadPositions() {
 }
 
 // ===================================
-// 5. RESUME STATUS POLLING (FIXED)
+// 5. RESUME STATUS POLLING
 // ===================================
 async function pollResumeStatus(resumeId, onComplete) {
     if (activePollingIntervals.has(resumeId)) {
@@ -227,11 +226,12 @@ function updateStatusDisplay(resumeId, status) {
     const statusElement = document.getElementById(`status-${resumeId}`);
     if (!statusElement) return;
     
+    const lang = getCurrentLanguage();
     const statusMessages = {
-        'pending': t('results.pending'),
-        'processing': t('results.processing'),
-        'completed': t('results.completed'),
-        'failed': t('results.failed')
+        'pending': t('results.pending', lang),
+        'processing': t('results.processing', lang),
+        'completed': t('results.completed', lang),
+        'failed': t('results.failed', lang)
     };
     
     statusElement.textContent = statusMessages[status] || status;
@@ -277,25 +277,26 @@ function cleanupPolling() {
 }
 
 // ===================================
-// 6. UPLOAD RESUME (FIXED)
+// 6. UPLOAD RESUME (SINGLE)
 // ===================================
 async function uploadResume() {
     const fileInput = document.getElementById('fileInput');
     const positionId = document.getElementById('positionSelect').value;
     const statusDiv = document.getElementById('uploadStatus');
     const resultDiv = document.getElementById('uploadResult');
+    const lang = getCurrentLanguage();
     
     if (!fileInput.files[0]) {
-        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile')}</div>`;
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile', lang)}</div>`;
         return;
     }
     
     if (!positionId) {
-        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition')}</div>`;
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition', lang)}</div>`;
         return;
     }
     
-    statusDiv.innerHTML = `<div class="alert alert-warning">${t('upload.uploadingMessage')}</div>`;
+    statusDiv.innerHTML = `<div class="alert alert-warning">${t('upload.uploadingMessage', lang)}</div>`;
     resultDiv.innerHTML = '';
     
     try {
@@ -305,21 +306,21 @@ async function uploadResume() {
             throw new Error(result.message || 'Upload failed');
         }
         
-        statusDiv.innerHTML = `<div class="alert alert-success">${t('upload.successMessage')}</div>`;
+        statusDiv.innerHTML = `<div class="alert alert-success">${t('upload.successMessage', lang)}</div>`;
         
         const resumeInfo = result.resume;
         const candidateInfo = result.candidate;
         
         resultDiv.innerHTML = `
             <div class="processing-card">
-                <h4>${t('upload.successMessage')}</h4>
+                <h4>${t('upload.successMessage', lang)}</h4>
                 <p><strong>Resume ID:</strong> ${resumeInfo.id}</p>
-                <p><strong>${t('results.candidate')}:</strong> ${candidateInfo.full_name}</p>
+                <p><strong>${t('results.candidate', lang)}:</strong> ${candidateInfo.full_name}</p>
                 <p><strong>File:</strong> ${resumeInfo.filename}</p>
-                <p><strong>${t('results.status')}:</strong> <span id="status-${resumeInfo.id}">${resumeInfo.processing_status}</span></p>
+                <p><strong>${t('results.status', lang)}:</strong> <span id="status-${resumeInfo.id}">${resumeInfo.processing_status}</span></p>
                 <div class="processing-spinner">
                     <div class="spinner"></div>
-                    <p>${t('upload.uploadingMessage')}</p>
+                    <p>${t('upload.uploadingMessage', lang)}</p>
                 </div>
             </div>
         `;
@@ -337,7 +338,7 @@ async function uploadResume() {
             } else if (finalStatus === 'failed') {
                 resultDiv.innerHTML += `
                     <div class="alert alert-error">
-                        ${t('notification.processingFailed')}
+                        ${t('notification.processingFailed', lang)}
                     </div>
                 `;
             }
@@ -352,8 +353,8 @@ async function uploadResume() {
 }
 
 // ===================================
-// ✅ FIXED: BULK UPLOAD RESUMES - COMPLETE IMPLEMENTATION
-// ===================================
+// ✅ FIXED: BULK UPLOAD RESUMES - REAL-TIME DISPLAY
+// =================================== 
 async function bulkUploadResumes() {
     console.log('🚀 bulkUploadResumes() called');
     
@@ -361,26 +362,25 @@ async function bulkUploadResumes() {
     const positionId = document.getElementById('positionSelect').value;
     const statusDiv = document.getElementById('uploadStatus');
     const resultDiv = document.getElementById('uploadResult');
+    const lang = getCurrentLanguage();
     
     // ✅ Validation
-    console.log('📋 Checking files:', filesInput?.files?.length);
-    
     if (!filesInput || !filesInput.files || filesInput.files.length === 0) {
         console.error('❌ No files selected');
-        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile')}</div>`;
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile', lang)}</div>`;
         return;
     }
     
     if (!positionId) {
         console.error('❌ No position selected');
-        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition')}</div>`;
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition', lang)}</div>`;
         return;
     }
     
     // ✅ Prevent concurrent uploads
     if (bulkUploadInProgress) {
         console.warn('⚠️ Upload already in progress');
-        showNotification('⏳ Upload already in progress', 'warning');
+        showNotification(t('notification.uploadInProgress', lang) || '⏳ آپلود در حال انجام است', 'warning');
         return;
     }
     
@@ -388,14 +388,18 @@ async function bulkUploadResumes() {
     const totalFiles = filesInput.files.length;
     let successCount = 0;
     let failureCount = 0;
-    const uploadedResumes = [];
+    const resultsMap = new Map(); // Map برای ذخیره نتایج
     
     console.log(`📤 Starting bulk upload: ${totalFiles} files for position ${positionId}`);
+    console.log(`Language: ${lang}`);
     
     // Show initial status
     statusDiv.innerHTML = `
         <div class="alert alert-warning">
-            ⏳ آپلود در حال انجام است... 0/${totalFiles}
+            ${t('upload.uploadingMessage', lang)}... 0/${totalFiles}
+            <div class="progress-bar" style="margin-top: 10px;">
+                <div class="progress-fill" style="width: 0%"></div>
+            </div>
         </div>
     `;
     resultDiv.innerHTML = '';
@@ -409,18 +413,26 @@ async function bulkUploadResumes() {
             console.log(`📤 Uploading file ${progressText}: ${file.name}`);
             
             try {
-                // Upload single file
                 const result = await api.uploadResume(file, positionId);
                 
                 if (result.success) {
                     successCount++;
-                    uploadedResumes.push(result.resume);
                     
-                    // Start polling for this resume
+                    // Store in map
+                    resultsMap.set(result.resume.id, {
+                        resume: result.resume,
+                        candidate: result.candidate,
+                        index: i + 1,  // صرفاً برای نمایش شماره ترتیبی
+                        status: 'processing',
+                        score: null
+                    });
+                    
+                    // ✅ Setup polling with callback
                     console.log(`✅ Polling started for resume ${result.resume.id}`);
-                    pollResumeStatus(result.resume.id);
+                    pollResumeStatus(result.resume.id, (statusData, finalStatus) => {
+                        handleBulkResumeCompletion(result.resume.id, statusData, resultsMap, resultDiv, lang);
+                    });
                     
-                    console.log(`✅ Uploaded: ${file.name}`);
                 } else {
                     failureCount++;
                     console.error(`❌ Failed: ${file.name}`, result.message);
@@ -434,7 +446,7 @@ async function bulkUploadResumes() {
             const progress = ((i + 1) / totalFiles) * 100;
             statusDiv.innerHTML = `
                 <div class="alert alert-warning">
-                    ⏳ آپلود در حال انجام است... ${progressText}
+                    ${t('upload.uploadingMessage', lang)}... ${progressText}
                     <div class="progress-bar" style="margin-top: 10px;">
                         <div class="progress-fill" style="width: ${progress}%"></div>
                     </div>
@@ -442,63 +454,192 @@ async function bulkUploadResumes() {
             `;
         }
         
-        // ✅ Show final results
         console.log(`📊 Upload complete: ${successCount} success, ${failureCount} failed`);
         
-        const resultSummary = `
+        // Create results container
+        const resultHeader = `
             <div class="processing-card">
-                <h4>✅ بارگذاری انجام شد!</h4>
+                <h4>${t('upload.successMessage', lang)}</h4>
                 <div style="background: var(--bg-dark); padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <p><strong>📊 کل فایل‌ها:</strong> ${totalFiles}</p>
-                    <p><strong style="color: #10b981;">✅ موفق:</strong> ${successCount}</p>
-                    <p><strong style="color: #ef4444;">❌ ناموفق:</strong> ${failureCount}</p>
+                    <p><strong>📊 ${t('upload.totalFilesLabel', lang) || 'Total Files'}:</strong> ${totalFiles}</p>
+                    <p><strong style="color: #10b981;">✅ ${t('upload.successLabel', lang) || 'Successful'}:</strong> ${successCount}</p>
+                    <p><strong style="color: #ef4444;">❌ ${t('upload.failedLabel', lang) || 'Failed'}:</strong> ${failureCount}</p>
                 </div>
                 
-                ${uploadedResumes.length > 0 ? `
-                    <h5 style="margin-top: 20px; margin-bottom: 10px;">📋 رزومه‌های بارگذاری شده:</h5>
-                    <div style="background: var(--bg-dark); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                        ${uploadedResumes.map((resume, idx) => `
-                            <div class="bulk-result-item success">
-                                <strong>${idx + 1}. Resume ID: ${resume.id}</strong>
-                                <p style="margin: 5px 0; font-size: 13px;">📁 ${resume.filename}</p>
-                                <p style="margin: 5px 0; font-size: 13px;">⏳ وضعیت: <span id="status-${resume.id}" style="color: #ffc107;">${resume.processing_status}</span></p>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
+                <h5 style="margin-top: 30px; margin-bottom: 15px; font-size: 16px; color: var(--text-primary);">
+                    📈 ${t('modal.overallScore', lang) || 'Overall Scores'}
+                </h5>
+                <div id="bulkResultsContainer" style="background: var(--bg-dark); padding: 15px; border-radius: 8px; max-height: 900px; overflow-y: auto; border: 1px solid var(--border);">
+                    <!-- Results will be added here as they complete -->
+                </div>
                 
-                <div class="processing-spinner" style="margin-top: 20px;">
+                <div class="processing-spinner" id="bulkProcessingSpinner" style="margin-top: 30px;">
                     <div class="spinner"></div>
-                    <p>⏳ در حال پردازش رزومه‌ها... این ممکن است چند دقیقه طول بکشد</p>
+                    <p>${t('upload.processingMessage', lang) || 'Processing resumes...'}</p>
                 </div>
             </div>
         `;
         
-        resultDiv.innerHTML = resultSummary;
-        statusDiv.innerHTML = `<div class="alert alert-success">✅ بارگذاری دسته‌ای تکمیل شد!</div>`;
+        resultDiv.innerHTML = resultHeader;
+        statusDiv.innerHTML = `<div class="alert alert-success">${t('upload.successMessage', lang)}</div>`;
         
-        // ✅ Clear file input
+        // Initialize empty results display
+        updateBulkResultsDisplay(resultsMap, resultDiv, lang);
+        
         filesInput.value = '';
-        
-        // ✅ Auto-refresh results after all processing completes
-        setTimeout(() => {
-            console.log('🔄 Refreshing results...');
-            loadResults();
-            loadDashboard();
-        }, 5000);
         
     } catch (error) {
         console.error('❌ Bulk upload error:', error);
         statusDiv.innerHTML = `<div class="alert alert-error">❌ ${error.message}</div>`;
-        resultDiv.innerHTML += `<div class="alert alert-error">خطا: ${error.message}</div>`;
     } finally {
         bulkUploadInProgress = false;
-        console.log('✅ Bulk upload operation completed');
     }
 }
 
 // ===================================
-// 7. LOAD DASHBOARD
+// Helper: Handle each resume completion
+// ===================================
+function handleBulkResumeCompletion(resumeId, statusData, resultsMap, resultDiv, lang) {
+    console.log(`✅ Resume ${resumeId} completed:`, statusData);
+    
+    if (resultsMap.has(resumeId)) {
+        const resultItem = resultsMap.get(resumeId);
+        resultItem.status = statusData.processing_status;
+        
+        if (statusData.score) {
+            resultItem.score = statusData.score;
+        }
+        
+        console.log(`Updating display for resume ${resumeId}`);
+        
+        // ✅ Update display immediately
+        updateBulkResultsDisplay(resultsMap, resultDiv, lang);
+    }
+    
+    // ✅ Check if all done
+    const allDone = Array.from(resultsMap.values()).every(
+        item => item.status === 'completed' || item.status === 'failed'
+    );
+    
+    if (allDone) {
+        console.log('🎉 All resumes processing completed!');
+        setTimeout(() => {
+            hideBulkProcessingSpinner(resultDiv);
+            loadResults();
+            loadDashboard();
+        }, 1000);
+    }
+}
+
+// ===================================
+// Helper: Update results display in real-time
+// ===================================
+function updateBulkResultsDisplay(resultsMap, resultDiv, lang) {
+    const container = resultDiv.querySelector('#bulkResultsContainer');
+    if (!container) return;
+    
+    if (resultsMap.size === 0) {
+        container.innerHTML = `<p style="text-align: center; color: var(--text-secondary);">${t('upload.waitingForResults', lang) || 'Waiting for results...'}</p>`;
+        return;
+    }
+    
+    let html = '';
+    
+    // Sort by index
+    const sortedResults = Array.from(resultsMap.values()).sort((a, b) => a.index - b.index);
+    
+    sortedResults.forEach((resultItem, idx) => {
+        const { resume, candidate, status, score } = resultItem;
+        
+        const statusColorMap = {
+            'pending': '#ffc107',
+            'processing': '#17a2b8',
+            'completed': '#28a745',
+            'failed': '#dc3545'
+        };
+        
+        const statusColor = statusColorMap[status] || '#666';
+        const statusText = {
+            'pending': t('results.pending', lang),
+            'processing': t('results.processing', lang),
+            'completed': t('results.completed', lang),
+            'failed': t('results.failed', lang)
+        }[status] || status;
+        
+        // ✅ Card with score display
+        html += `
+            <div class="bulk-result-card" style="border-left: 4px solid ${statusColor}; background: var(--bg-light); padding: 18px; margin-bottom: 15px; border-radius: 8px; transition: all 0.3s;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <strong style="font-size: 15px; color: var(--text-primary);">📄 #${idx + 1} - ${candidate?.full_name || 'Processing'}</strong>
+                        <p style="margin: 6px 0 0 0; font-size: 12px; color: var(--text-secondary);">📁 ${resume.filename}</p>
+                    </div>
+                    <span style="background-color: ${statusColor}; color: white; padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;">
+                        ${statusText}
+                    </span>
+                </div>
+                
+                <!-- ✅ Score Display (when available) -->
+                ${score ? `
+                    <div style="background: var(--bg-medium); padding: 16px; border-radius: 8px; margin-top: 12px;">
+                        <div style="display: grid; grid-template-columns: 1fr auto; gap: 25px; align-items: center;">
+                            <!-- Score Info -->
+                            <div>
+                                <p style="margin: 0 0 10px 0;">
+                                    <strong style="color: var(--text-primary);">📊 ${t('modal.overallScore', lang)}:</strong>
+                                    <span style="font-weight: bold; color: ${score.status === 'Qualified' ? '#10b981' : '#ef4444'}; font-size: 16px; margin-left: 8px;">
+                                        ${score.percentage.toFixed(1)}%
+                                    </span>
+                                </p>
+                                <p style="margin: 8px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+                                    ${t('results.score', lang)}: 
+                                    <strong style="color: var(--text-primary);">${score.total_score.toFixed(1)} / ${score.max_possible_score.toFixed(1)}</strong>
+                                </p>
+                                <p style="margin: 8px 0 0 0; font-size: 13px;">
+                                    <strong>${t('modal.statusText', lang)}:</strong> 
+                                    <span style="color: ${score.status === 'Qualified' ? '#10b981' : '#ef4444'}; font-weight: bold;">
+                                        ${t(`modal.${score.status.toLowerCase()}`, lang) || score.status}
+                                    </span>
+                                </p>
+                                ${score.overall_assessment ? `
+                                    <p style="margin: 10px 0 0 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                                        💡 ${score.overall_assessment}
+                                    </p>
+                                ` : ''}
+                            </div>
+                            
+                            <!-- Score Circle -->
+                            <div style="text-align: center; flex-shrink: 0;">
+                                <div style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid ${score.status === 'Qualified' ? '#10b981' : '#ef4444'}; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: ${score.status === 'Qualified' ? '#10b981' : '#ef4444'}; background: var(--bg-dark);">
+                                    ${score.percentage.toFixed(1)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <p style="margin: 12px 0 0 0; font-size: 12px; color: var(--text-secondary); font-style: italic;">
+                        ⏳ ${t('upload.waitingForResults', lang) || 'Waiting for results...'}
+                    </p>
+                `}
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// ===================================
+// Helper: Hide processing spinner
+// ===================================
+function hideBulkProcessingSpinner(resultDiv) {
+    const spinner = resultDiv.querySelector('#bulkProcessingSpinner');
+    if (spinner) {
+        spinner.style.display = 'none';
+    }
+}
+
+// ===================================
+// 7. LOAD DASHBOARD (FIXED STYLING)
 // ===================================
 async function loadDashboard() {
     try {
@@ -539,18 +680,51 @@ async function loadDashboard() {
             `;
         }
         
+        // ✅ FIXED: Recent Applications with proper styling
         const recentDiv = document.getElementById('recentApplications');
         if (recentDiv) {
-            recentDiv.innerHTML = `<h3>${t('dashboard.recentApplications')}</h3>`;
-            resumes.slice(0, 5).forEach(resume => {
-                recentDiv.innerHTML += `
-                    <div class="recent-item">
-                        <strong>${resume.candidate?.full_name || t('upload.uploadingMessage')}</strong>
-                        <span class="status-${resume.processing_status}">${resume.processing_status}</span>
-                        <small>${new Date(resume.uploaded_at).toLocaleDateString()}</small>
-                    </div>
-                `;
-            });
+            let html = `<h3 style="margin-top: 40px; margin-bottom: 20px; color: var(--text-primary); font-size: 18px; font-weight: 600;">${t('dashboard.recentApplications')}</h3>`;
+            
+            if (resumes.length === 0) {
+                html += `<p style="text-align: center; color: var(--text-secondary); padding: 30px;">${t('results.noResumes')}</p>`;
+            } else {
+                html += `<div style="display: grid; gap: 12px;">`;
+                
+                resumes.slice(0, 5).forEach(resume => {
+                    const statusColor = {
+                        'completed': '#10b981',
+                        'processing': '#f59e0b',
+                        'pending': '#3b82f6',
+                        'failed': '#ef4444'
+                    }[resume.processing_status] || '#64748b';
+                    
+                    const statusBg = {
+                        'completed': 'rgba(16, 185, 129, 0.15)',
+                        'processing': 'rgba(245, 158, 11, 0.15)',
+                        'pending': 'rgba(59, 130, 246, 0.15)',
+                        'failed': 'rgba(239, 68, 68, 0.15)'
+                    }[resume.processing_status] || 'rgba(100, 116, 139, 0.15)';
+                    
+                    html += `
+                        <div style="background: var(--bg-light); border-left: 4px solid ${statusColor}; padding: 14px 16px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                            <div style="flex: 1;">
+                                <strong style="color: var(--text-primary); font-size: 14px;">${resume.candidate?.full_name || 'Processing'}</strong>
+                                <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-secondary);">${resume.position?.title || 'N/A'}</p>
+                            </div>
+                            <div style="text-align: right; flex-shrink: 0;">
+                                <span style="background: ${statusBg}; color: ${statusColor}; padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;">
+                                    ${resume.processing_status}
+                                </span>
+                                <p style="margin: 6px 0 0 0; font-size: 11px; color: var(--text-secondary);">${new Date(resume.uploaded_at).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += `</div>`;
+            }
+            
+            recentDiv.innerHTML = html;
         }
         
     } catch (error) {
@@ -564,6 +738,7 @@ async function loadDashboard() {
 // ===================================
 async function loadResults() {
     try {
+        const lang = getCurrentLanguage();
         const filters = {};
         
         const positionSelect = document.getElementById('filterPosition');
@@ -580,8 +755,6 @@ async function loadResults() {
         
         filters.score_min = resultsFilters.score_min;
         filters.score_max = resultsFilters.score_max;
-        
-        console.log('Filters being applied:', filters);
         
         const data = await api.getResumes(filters);
         let resumes = data.resumes || [];
@@ -654,9 +827,10 @@ async function loadResults() {
 }
 
 // ===================================
-// 9. SCORE RANGE FILTER WITH URGENCY SLIDER
+// 9. SCORE RANGE FILTER
 // ===================================
 function initializeScoreRangeFilter() {
+    const lang = getCurrentLanguage();
     const filterContainer = document.getElementById('scoreRangeFilterContainer');
     if (!filterContainer) return;
     
@@ -667,7 +841,6 @@ function initializeScoreRangeFilter() {
                 <p class="filter-subtitle">${t('results.adjustUrgency')}</p>
             </div>
             
-            <!-- Urgency Slider Section -->
             <div class="urgency-section">
                 <div class="urgency-header">
                     <label>${t('results.urgencyLevel')}</label>
@@ -780,6 +953,7 @@ function initializeScoreRangeFilter() {
 }
 
 function updateUrgencyFilter() {
+    const lang = getCurrentLanguage();
     const slider = document.getElementById('urgencySlider');
     const urgency = parseInt(slider.value);
     resultsFilters.urgency = urgency;
@@ -794,13 +968,13 @@ function updateUrgencyFilter() {
     const urgencyDescription = document.getElementById('urgencyDescription');
     
     if (urgency < 30) {
-        urgencyValue.textContent = 'Low (Strict)';
+        urgencyValue.textContent = t('results.lowUrgency');
         urgencyDescription.textContent = t('results.lowUrgencyDesc');
     } else if (urgency < 70) {
-        urgencyValue.textContent = 'Medium (Balanced)';
+        urgencyValue.textContent = 'Medium';
         urgencyDescription.textContent = t('results.mediumUrgencyDesc');
     } else {
-        urgencyValue.textContent = 'High (Flexible)';
+        urgencyValue.textContent = t('results.highUrgency');
         urgencyDescription.textContent = t('results.highUrgencyDesc');
     }
     
@@ -855,12 +1029,14 @@ function updateManualRange() {
 }
 
 function applyScoreFilter() {
+    const lang = getCurrentLanguage();
     console.log('Applying score filter:', resultsFilters);
     loadResults();
     showNotification(`${t('results.filterApplied')} ${resultsFilters.score_min}% - ${resultsFilters.score_max}%`, 'success');
 }
 
 function resetScoreFilter() {
+    const lang = getCurrentLanguage();
     resultsFilters.score_min = 0;
     resultsFilters.score_max = 100;
     resultsFilters.urgency = 50;
@@ -887,7 +1063,7 @@ async function filterResults() {
 }
 
 // ===================================
-// 11. VIEW RESUME DETAILS WITH POPUP
+// 11. VIEW RESUME DETAILS
 // ===================================
 async function viewResumeDetails(resumeId) {
     try {
@@ -1263,7 +1439,7 @@ function showNotification(message, type = 'info') {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('App.js: DOM loaded');
     
-    // ✅ FIXED: File input event listener
+    // ✅ File input event listener
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
@@ -1275,14 +1451,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
-    // ✅ FIXED: Files input event listener for bulk upload
+    // ✅ FIXED: Files input event listener with proper Persian translation
     const filesInput = document.getElementById('filesInput');
     if (filesInput) {
         filesInput.addEventListener('change', (e) => {
             const count = e.target.files.length;
             const fileCountDisplay = document.getElementById('fileCount');
             if (fileCountDisplay) {
-                fileCountDisplay.textContent = count > 0 ? `${count} فایل انتخاب شد` : t('upload.noFileSelected');
+                const lang = getCurrentLanguage();
+                if (count > 0) {
+                    const filesText = lang === 'fa' ? 'فایل انتخاب شد' : lang === 'ar' ? 'تم اختيار الملفات' : 'files selected';
+                    fileCountDisplay.textContent = `${count} ${filesText}`;
+                } else {
+                    fileCountDisplay.textContent = t('upload.noFileSelected', lang);
+                }
             }
         });
     }
