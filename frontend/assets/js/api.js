@@ -86,6 +86,7 @@ const api = {
         return await response.json();
     },
 
+    // ✅ FIXED: Single resume upload
     async uploadResume(file, positionId) {
         const formData = new FormData();
         formData.append('file', file);
@@ -111,28 +112,42 @@ const api = {
         return await response.json();
     },
 
+    // ✅ NEW: Bulk upload resumes (کاری نمی‌کند - باید از uploadResume استفاده کنید)
+    // این API method از سمت backend پشتیبانی نمی‌شود
+    // بجای آن، از uploadResume به صورت sequential استفاده می‌شود
     async bulkUploadResumes(files, positionId) {
-        const formData = new FormData();
-        files.forEach(file => formData.append('files', file));
-        formData.append('position_id', positionId);
+        console.warn('⚠️ bulkUploadResumes() - This method is simulated. Using uploadResume() for each file');
         
+        const results = [];
         const token = localStorage.getItem('access_token');
         const headers = {};
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
         
-        const response = await fetch(`${API_URL}/resumes/bulk`, {
-            method: 'POST',
-            headers: headers,
-            body: formData
-        });
-        
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({ message: 'Bulk upload failed' }));
-            throw new Error(error.message || 'Bulk upload failed');
+        for (let i = 0; i < files.length; i++) {
+            try {
+                const result = await this.uploadResume(files[i], positionId);
+                results.push({
+                    success: true,
+                    file: files[i].name,
+                    data: result
+                });
+            } catch (error) {
+                results.push({
+                    success: false,
+                    file: files[i].name,
+                    error: error.message
+                });
+            }
         }
-        return await response.json();
+        
+        return {
+            total: files.length,
+            successful: results.filter(r => r.success).length,
+            failed: results.filter(r => !r.success).length,
+            results: results
+        };
     },
 
     async getResumes(filters = {}) {

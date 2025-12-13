@@ -1,5 +1,5 @@
 // ===================================
-// COMPLETE app.js with Translations Support
+// COMPLETE app.js with Translations Support & FIXED Bulk Upload
 // ===================================
 
 let uploadMode = 'single';
@@ -7,6 +7,7 @@ let currentPositions = [];
 let currentResumes = [];
 let currentCandidates = [];
 let activePollingIntervals = new Map();
+let bulkUploadInProgress = false; // ✅ CRITICAL: Track bulk upload state
 
 let resultsFilters = {
     position_id: '',
@@ -52,15 +53,11 @@ function updatePageWithLanguage() {
     tabs.forEach((tab, index) => {
         if (translationKeys[index]) {
             tab.textContent = t(translationKeys[index], lang);
-            // اضافه کردن data-i18n برای تطابق
             tab.setAttribute('data-i18n', translationKeys[index]);
         }
     });
     
-    // به‌روزرسانی Title های Tab Contents
     updateTabTitles(lang);
-    
-    // به‌روزرسانی دکمه‌های Logout و Status
     updateHeaderElements(lang);
 }
 
@@ -351,6 +348,152 @@ async function uploadResume() {
     } catch (error) {
         console.error('Upload error:', error);
         statusDiv.innerHTML = `<div class="alert alert-error">❌ ${error.message}</div>`;
+    }
+}
+
+// ===================================
+// ✅ FIXED: BULK UPLOAD RESUMES - COMPLETE IMPLEMENTATION
+// ===================================
+async function bulkUploadResumes() {
+    console.log('🚀 bulkUploadResumes() called');
+    
+    const filesInput = document.getElementById('filesInput');
+    const positionId = document.getElementById('positionSelect').value;
+    const statusDiv = document.getElementById('uploadStatus');
+    const resultDiv = document.getElementById('uploadResult');
+    
+    // ✅ Validation
+    console.log('📋 Checking files:', filesInput?.files?.length);
+    
+    if (!filesInput || !filesInput.files || filesInput.files.length === 0) {
+        console.error('❌ No files selected');
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noFile')}</div>`;
+        return;
+    }
+    
+    if (!positionId) {
+        console.error('❌ No position selected');
+        statusDiv.innerHTML = `<div class="alert alert-error">${t('upload.noPosition')}</div>`;
+        return;
+    }
+    
+    // ✅ Prevent concurrent uploads
+    if (bulkUploadInProgress) {
+        console.warn('⚠️ Upload already in progress');
+        showNotification('⏳ Upload already in progress', 'warning');
+        return;
+    }
+    
+    bulkUploadInProgress = true;
+    const totalFiles = filesInput.files.length;
+    let successCount = 0;
+    let failureCount = 0;
+    const uploadedResumes = [];
+    
+    console.log(`📤 Starting bulk upload: ${totalFiles} files for position ${positionId}`);
+    
+    // Show initial status
+    statusDiv.innerHTML = `
+        <div class="alert alert-warning">
+            ⏳ آپلود در حال انجام است... 0/${totalFiles}
+        </div>
+    `;
+    resultDiv.innerHTML = '';
+    
+    try {
+        // ✅ Upload files sequentially
+        for (let i = 0; i < totalFiles; i++) {
+            const file = filesInput.files[i];
+            const progressText = `${i + 1}/${totalFiles}`;
+            
+            console.log(`📤 Uploading file ${progressText}: ${file.name}`);
+            
+            try {
+                // Upload single file
+                const result = await api.uploadResume(file, positionId);
+                
+                if (result.success) {
+                    successCount++;
+                    uploadedResumes.push(result.resume);
+                    
+                    // Start polling for this resume
+                    console.log(`✅ Polling started for resume ${result.resume.id}`);
+                    pollResumeStatus(result.resume.id);
+                    
+                    console.log(`✅ Uploaded: ${file.name}`);
+                } else {
+                    failureCount++;
+                    console.error(`❌ Failed: ${file.name}`, result.message);
+                }
+            } catch (fileError) {
+                failureCount++;
+                console.error(`❌ Error uploading ${file.name}:`, fileError);
+            }
+            
+            // ✅ Update progress bar
+            const progress = ((i + 1) / totalFiles) * 100;
+            statusDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    ⏳ آپلود در حال انجام است... ${progressText}
+                    <div class="progress-bar" style="margin-top: 10px;">
+                        <div class="progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // ✅ Show final results
+        console.log(`📊 Upload complete: ${successCount} success, ${failureCount} failed`);
+        
+        const resultSummary = `
+            <div class="processing-card">
+                <h4>✅ بارگذاری انجام شد!</h4>
+                <div style="background: var(--bg-dark); padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>📊 کل فایل‌ها:</strong> ${totalFiles}</p>
+                    <p><strong style="color: #10b981;">✅ موفق:</strong> ${successCount}</p>
+                    <p><strong style="color: #ef4444;">❌ ناموفق:</strong> ${failureCount}</p>
+                </div>
+                
+                ${uploadedResumes.length > 0 ? `
+                    <h5 style="margin-top: 20px; margin-bottom: 10px;">📋 رزومه‌های بارگذاری شده:</h5>
+                    <div style="background: var(--bg-dark); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                        ${uploadedResumes.map((resume, idx) => `
+                            <div class="bulk-result-item success">
+                                <strong>${idx + 1}. Resume ID: ${resume.id}</strong>
+                                <p style="margin: 5px 0; font-size: 13px;">📁 ${resume.filename}</p>
+                                <p style="margin: 5px 0; font-size: 13px;">⏳ وضعیت: <span id="status-${resume.id}" style="color: #ffc107;">${resume.processing_status}</span></p>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <div class="processing-spinner" style="margin-top: 20px;">
+                    <div class="spinner"></div>
+                    <p>⏳ در حال پردازش رزومه‌ها... این ممکن است چند دقیقه طول بکشد</p>
+                </div>
+            </div>
+        `;
+        
+        resultDiv.innerHTML = resultSummary;
+        statusDiv.innerHTML = `<div class="alert alert-success">✅ بارگذاری دسته‌ای تکمیل شد!</div>`;
+        
+        // ✅ Clear file input
+        filesInput.value = '';
+        
+        // ✅ Auto-refresh results after all processing completes
+        setTimeout(() => {
+            console.log('🔄 Refreshing results...');
+            loadResults();
+            loadDashboard();
+        }, 5000);
+        
+    } catch (error) {
+        console.error('❌ Bulk upload error:', error);
+        statusDiv.innerHTML = `<div class="alert alert-error">❌ ${error.message}</div>`;
+        resultDiv.innerHTML += `<div class="alert alert-error">خطا: ${error.message}</div>`;
+    } finally {
+        bulkUploadInProgress = false;
+        console.log('✅ Bulk upload operation completed');
     }
 }
 
@@ -1120,6 +1263,7 @@ function showNotification(message, type = 'info') {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('App.js: DOM loaded');
     
+    // ✅ FIXED: File input event listener
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
@@ -1131,13 +1275,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
+    // ✅ FIXED: Files input event listener for bulk upload
     const filesInput = document.getElementById('filesInput');
     if (filesInput) {
         filesInput.addEventListener('change', (e) => {
             const count = e.target.files.length;
             const fileCountDisplay = document.getElementById('fileCount');
             if (fileCountDisplay) {
-                fileCountDisplay.textContent = `${count} ${t('upload.filesSelected')}`;
+                fileCountDisplay.textContent = count > 0 ? `${count} فایل انتخاب شد` : t('upload.noFileSelected');
             }
         });
     }
@@ -1146,7 +1291,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         cleanupPolling();
     });
     
-    // بروزرسانی صفحه با ترجمه‌های دینامی
     updatePageWithLanguage();
 });
 

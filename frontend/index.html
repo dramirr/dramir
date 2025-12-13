@@ -665,12 +665,12 @@
                         <button class="btn-primary" onclick="uploadResume()" data-i18n="upload.uploadButton">📤 Upload & Analyze</button>
                     </div>
 
-                    <!-- Bulk Upload -->
+                    <!-- Bulk Upload - ✅ FIXED: Correct ID "filesInput" -->
                     <div id="bulkUpload" style="display:none;">
                         <div class="form-group">
                             <label data-i18n="upload.selectMultiple">Select Multiple Resumes</label>
                             <input type="file" id="filesInput" class="form-control" multiple accept=".pdf,.docx,.doc,.jpg,.jpeg,.png">
-                            <small id="fileCount" style="display: block; margin-top: 5px; color: var(--text-secondary);" data-i18n="upload.noFileSelected">0 file(s) selected</small>
+                            <small id="fileCount" style="display: block; margin-top: 5px; color: var(--text-secondary);" data-i18n="upload.noFileSelected">No file selected</small>
                         </div>
                         <button class="btn-primary" onclick="bulkUploadResumes()" data-i18n="upload.uploadAllButton">📤 Upload All</button>
                     </div>
@@ -684,13 +684,12 @@
             <div id="results" class="tab-content">
                 <h2 data-i18n="results.title">All Results</h2>
                 
-                <!-- ✅ FIXED & IMPROVED: Results Filters -->
+                <!-- Results Filters -->
                 <div class="filters">
                     <select id="filterPosition" class="form-control" onchange="filterResults()">
                         <option value="" data-i18n="results.allPositions">All Positions</option>
                     </select>
                     
-                    <!-- ✅ FIXED: Status Filter Now Works -->
                     <select id="filterStatus" class="form-control" onchange="filterResults()">
                         <option value="all" data-i18n="results.allStatus">All Status</option>
                         <option value="completed" data-i18n="results.completed">✅ Completed</option>
@@ -700,7 +699,7 @@
                     </select>
                 </div>
                 
-                <!-- ✅ NEW: Beautiful Score Range Filter -->
+                <!-- Score Range Filter -->
                 <div id="scoreRangeFilterContainer"></div>
                 
                 <!-- Results Table -->
@@ -758,10 +757,9 @@
     <!-- 5. Main app logic -->
     <script src="/assets/js/app.js"></script>
     
-    <!-- ✅ NEW: Initialize Score Range Filter after page load -->
+    <!-- Initialize Score Range Filter -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize score range filter when results tab is loaded
             setTimeout(() => {
                 if (document.getElementById('scoreRangeFilterContainer')) {
                     initializeScoreRangeFilter();
